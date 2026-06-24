@@ -84,6 +84,13 @@ Recommended modes:
 Reusable public templates should implement `dry-run` or static examples only.
 Live transport belongs in the private project repository.
 
+In a live project, the private adapter should still use the same JSON contract:
+it submits the rendered request, monitors prompt delivery and generation,
+captures the promoted Web review plus payload, writes `handoff_record.json` and
+`inbox_record.json`, and lets the reusable runner validate them. The public
+runner should not contain project conversation ids, browser profile details,
+connector settings, endpoints, tokens, local paths, or remote host names.
+
 ## Forbidden Capabilities
 
 Adapters must not expose or perform:

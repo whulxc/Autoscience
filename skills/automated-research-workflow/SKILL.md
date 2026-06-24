@@ -78,6 +78,11 @@ review. Use MCP/bridge automation outside that Web-side evidence path to:
 - stage a controlled inbox entry containing only the review decision and next
   `/goal`.
 
+In practical use, this should still feel like one Codex CLI window plus one
+fixed ChatGPT Web review conversation. Codex commits evidence to GitHub; the
+private adapter moves the Codex conclusion to Web and returns the verified Web
+decision to Codex for validation.
+
 Never expose generic write, edit, apply-patch, bash, shell, terminal, raw data,
 checkpoint, remote GPU, training, inference, evaluation, parser, target, split,
 or view capabilities through MCP.

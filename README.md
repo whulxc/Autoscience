@@ -95,6 +95,11 @@ See `docs/transport_adapter_contract.md` before writing a project adapter. In
 short: GitHub remains the formal evidence source; the adapter only submits,
 monitors, and returns the Web review decision.
 
+In practical use, the user can keep watching one Codex CLI window and one fixed
+ChatGPT Web review conversation. Codex still commits evidence to GitHub; the
+private adapter only reduces manual copy/paste and blind waiting by moving the
+Codex conclusion to Web and bringing the verified review result back to Codex.
+
 ## Project-Specific Setup
 
 Copy this template into a real research repository and replace the placeholders

@@ -14,6 +14,7 @@ Do not use MCP as a second evidence source when GitHub already contains the
 review materials. MCP is valuable because it removes manual copy/paste,
 prevents blind waiting, detects Web delivery failures, and returns a structured
 result to Codex.
+For the full connector split, see `github_mcp_role_split.md`.
 
 ## Roles
 

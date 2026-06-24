@@ -103,6 +103,8 @@ tokens, transcripts, or private host details to this template.
 See `docs/transport_adapter_contract.md` before writing a project adapter. In
 short: GitHub remains the formal evidence source; the adapter only submits,
 monitors, and returns the Web review decision.
+For a plain-language split between GitHub and MCP/bridge responsibilities, read
+`docs/github_mcp_role_split.md`.
 
 In practical use, the user can keep watching one Codex CLI window and one fixed
 ChatGPT Web review conversation. Codex still commits evidence to GitHub; the

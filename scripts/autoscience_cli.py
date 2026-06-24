@@ -26,9 +26,11 @@ from autoscience.control_plane import (  # noqa: E402
     validate_scientific_policy,
 )
 from autoscience.workflow import (  # noqa: E402
+    consume_inbox_record,
     enqueue_inbox_record,
     render_web_review_request,
     summarize_workflow_health,
+    summarize_inbox_queue,
     write_review_request,
 )
 
@@ -109,6 +111,18 @@ def command_enqueue_inbox(args: argparse.Namespace) -> int:
     return 0 if result.ok else 2
 
 
+def command_inbox_status(args: argparse.Namespace) -> int:
+    result = summarize_inbox_queue(Path(args.queue_dir), expected_commit=args.expected_commit or None)
+    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    return 0 if result.ok else 2
+
+
+def command_consume_inbox(args: argparse.Namespace) -> int:
+    result = consume_inbox_record(Path(args.record), expected_commit=args.expected_commit or None)
+    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    return 0 if result.ok else 2
+
+
 def command_workflow_health(args: argparse.Namespace) -> int:
     result = summarize_workflow_health(
         policy=load_json(Path(args.policy)) if args.policy else None,
@@ -183,6 +197,16 @@ def build_parser() -> argparse.ArgumentParser:
     enqueue.add_argument("--queue-dir", required=True)
     enqueue.add_argument("--expected-commit", default="")
     enqueue.set_defaults(func=command_enqueue_inbox)
+
+    inbox_status = sub.add_parser("inbox-status")
+    inbox_status.add_argument("--queue-dir", required=True)
+    inbox_status.add_argument("--expected-commit", default="")
+    inbox_status.set_defaults(func=command_inbox_status)
+
+    consume = sub.add_parser("consume-inbox")
+    consume.add_argument("record")
+    consume.add_argument("--expected-commit", default="")
+    consume.set_defaults(func=command_consume_inbox)
 
     health = sub.add_parser("workflow-health")
     health.add_argument("--policy", default="")

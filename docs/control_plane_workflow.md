@@ -67,6 +67,9 @@ python3 scripts/autoscience_cli.py validate-handoff examples/valid_handoff_recor
 python3 scripts/autoscience_cli.py enqueue-inbox examples/valid_inbox_record.json \
   --queue-dir /tmp/autoscience_goal_inbox \
   --expected-commit 0123456789abcdef0123456789abcdef01234567
+python3 scripts/autoscience_cli.py inbox-status \
+  --queue-dir /tmp/autoscience_goal_inbox \
+  --expected-commit 0123456789abcdef0123456789abcdef01234567
 python3 scripts/autoscience_cli.py workflow-health \
   --policy configs/control_plane_policy.example.json \
   --scientific-policy configs/scientific_policy.example.json \

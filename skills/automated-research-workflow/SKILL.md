@@ -117,6 +117,9 @@ Use the reusable CLI sequence:
 python3 scripts/autoscience_cli.py make-review-request ...
 python3 scripts/autoscience_cli.py validate-handoff <handoff.json>
 python3 scripts/autoscience_cli.py validate-inbox <inbox.json>
+python3 scripts/autoscience_cli.py enqueue-inbox <inbox.json> --queue-dir <queue>
+python3 scripts/autoscience_cli.py inbox-status --queue-dir <queue>
+python3 scripts/autoscience_cli.py consume-inbox <queued-record.json>
 python3 scripts/autoscience_cli.py workflow-health ...
 ```
 

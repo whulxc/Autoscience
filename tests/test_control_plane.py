@@ -25,7 +25,12 @@ from autoscience.control_plane import (  # noqa: E402
     validate_policy,
     validate_scientific_policy,
 )
-from autoscience.workflow import render_web_review_request, summarize_workflow_health  # noqa: E402
+from autoscience.workflow import (  # noqa: E402
+    consume_inbox_record,
+    render_web_review_request,
+    summarize_inbox_queue,
+    summarize_workflow_health,
+)
 
 
 GOOD_COMMIT = "0123456789abcdef0123456789abcdef01234567"
@@ -250,6 +255,24 @@ class ControlPlaneTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(len(list(queue_dir.glob("*.json"))), 1)
+
+    def test_inbox_status_and_consume(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            queue_dir = Path(tmp) / "queue"
+            queue_dir.mkdir()
+            record_path = queue_dir / "record.json"
+            record_path.write_text(json.dumps(valid_record(), indent=2), encoding="utf-8")
+
+            status = summarize_inbox_queue(queue_dir, expected_commit=GOOD_COMMIT)
+            self.assertTrue(status.ok, status.to_dict())
+            self.assertEqual(status.details["record_count"], 1)
+
+            consumed = consume_inbox_record(record_path, expected_commit=GOOD_COMMIT)
+            self.assertTrue(consumed.ok, consumed.to_dict())
+
+            duplicate = consume_inbox_record(record_path, expected_commit=GOOD_COMMIT)
+            self.assertFalse(duplicate.ok)
+            self.assertIn("inbox_record_already_consumed", duplicate.issues)
 
 
 if __name__ == "__main__":

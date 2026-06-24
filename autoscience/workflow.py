@@ -92,6 +92,51 @@ def enqueue_inbox_record(record: dict[str, Any], queue_dir: Path, *, expected_co
     return ValidationResult(ok=True, details={"target": str(target)})
 
 
+def summarize_inbox_queue(queue_dir: Path, *, expected_commit: str | None = None) -> ValidationResult:
+    issues: list[str] = []
+    warnings: list[str] = []
+    records: list[dict[str, Any]] = []
+    for path in sorted(queue_dir.glob("*.json")):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            issues.append(f"inbox_record_json_invalid:{path}")
+            continue
+        result = validate_inbox_record(record, expected_commit=expected_commit)
+        if result.issues:
+            issues.extend(f"{path}:{item}" for item in result.issues)
+        if result.warnings:
+            warnings.extend(f"{path}:{item}" for item in result.warnings)
+        records.append(
+            {
+                "path": str(path),
+                "ok": result.ok,
+                "expected_commit": result.details.get("expected_commit", ""),
+                "gate_decision": result.details.get("gate_decision", ""),
+                "consumed": bool(record.get("consumed")),
+            }
+        )
+    return ValidationResult(
+        ok=not issues,
+        issues=issues,
+        warnings=warnings,
+        details={"queue_dir": str(queue_dir), "record_count": len(records), "records": records},
+    )
+
+
+def consume_inbox_record(record_path: Path, *, expected_commit: str | None = None) -> ValidationResult:
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    result = validate_inbox_record(record, expected_commit=expected_commit)
+    if not result.ok:
+        return result
+    if bool(record.get("consumed")):
+        return ValidationResult(ok=False, issues=["inbox_record_already_consumed"])
+    record["consumed"] = True
+    record["consumed_at_utc"] = utc_now_iso()
+    record_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return ValidationResult(ok=True, details={"record": str(record_path)})
+
+
 def summarize_workflow_health(
     *,
     policy: dict[str, Any] | None = None,

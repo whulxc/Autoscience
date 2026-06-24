@@ -114,6 +114,19 @@ returned goal is safe to execute.
 Use the reusable CLI sequence:
 
 ```bash
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json
+```
+
+Use `run-unit` for the full deterministic unit when a project has already
+produced transport handoff/inbox JSON, or when a private local adapter is
+allowed to produce those records. It renders the review request, validates
+policies, validates request hash, required-file coverage, handoff/inbox,
+enqueues the next goal, and writes a unit report. Public templates should use
+`static_files`; project-private adapters may use `local_command` with no shell
+expansion and explicit `allow_local_transport_command=true`. For lower-level
+debugging, run the component commands:
+
+```bash
 python3 scripts/autoscience_cli.py make-review-request ...
 python3 scripts/autoscience_cli.py validate-handoff <handoff.json>
 python3 scripts/autoscience_cli.py validate-inbox <inbox.json>

@@ -21,5 +21,9 @@ Before publishing or sharing an automated-research workflow template:
 - Run all `validate-csv-schema` checks for example registries.
 - Run `python3 scripts/autoscience_cli.py workflow-health ...` with the
   template policy, scientific policy, handoff, inbox, and expected commit.
+- Run `python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json`.
+- If a project adds a `local_command` transport adapter, keep it private unless
+  it contains no real session ids, endpoints, tokens, private paths, or raw
+  transcript material.
 - Run `python3 scripts/autoscience_cli.py privacy-scan --strict .`.
 - Run `python3 -m unittest discover -s tests`.

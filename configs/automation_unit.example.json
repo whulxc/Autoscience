@@ -1,0 +1,23 @@
+{
+  "artifact_dir": "runtime/autoscience_example_unit",
+  "branch": "main",
+  "conclusion_file": "examples/codex_execution_conclusion.example.md",
+  "consume_after_enqueue": false,
+  "expected_commit": "0123456789abcdef0123456789abcdef01234567",
+  "policy_path": "configs/control_plane_policy.example.json",
+  "queue_dir": "runtime/autoscience_example_inbox",
+  "repository": "OWNER/REPO",
+  "required_files": [
+    "docs/control_plane_workflow.md",
+    "docs/security_model.md",
+    "configs/control_plane_policy.example.json",
+    "configs/scientific_policy.example.json"
+  ],
+  "scientific_policy_path": "configs/scientific_policy.example.json",
+  "template_path": "templates/web_review_request.md",
+  "transport": {
+    "mode": "static_files",
+    "handoff_record": "examples/valid_handoff_record.json",
+    "inbox_record": "examples/valid_inbox_record.json"
+  }
+}

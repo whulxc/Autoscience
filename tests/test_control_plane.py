@@ -28,12 +28,19 @@ from autoscience.control_plane import (  # noqa: E402
 from autoscience.workflow import (  # noqa: E402
     consume_inbox_record,
     render_web_review_request,
+    run_automation_unit,
     summarize_inbox_queue,
     summarize_workflow_health,
 )
 
 
 GOOD_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+FULL_REQUIRED_FILES = [
+    "docs/control_plane_workflow.md",
+    "docs/security_model.md",
+    "configs/control_plane_policy.example.json",
+    "configs/scientific_policy.example.json",
+]
 
 
 def valid_record() -> dict:
@@ -273,6 +280,144 @@ class ControlPlaneTest(unittest.TestCase):
             duplicate = consume_inbox_record(record_path, expected_commit=GOOD_COMMIT)
             self.assertFalse(duplicate.ok)
             self.assertIn("inbox_record_already_consumed", duplicate.issues)
+
+    def test_run_automation_unit_static_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = {
+                "artifact_dir": str(Path(tmp) / "artifacts"),
+                "branch": "main",
+                "conclusion_file": "examples/codex_execution_conclusion.example.md",
+                "expected_commit": GOOD_COMMIT,
+                "policy_path": "configs/control_plane_policy.example.json",
+                "queue_dir": str(Path(tmp) / "queue"),
+                "repository": "OWNER/REPO",
+                "required_files": FULL_REQUIRED_FILES,
+                "scientific_policy_path": "configs/scientific_policy.example.json",
+                "template_path": "templates/web_review_request.md",
+                "transport": {
+                    "mode": "static_files",
+                    "handoff_record": "examples/valid_handoff_record.json",
+                    "inbox_record": "examples/valid_inbox_record.json",
+                },
+            }
+            result = run_automation_unit(config, base_dir=ROOT)
+            self.assertTrue(result.validation.ok, result.to_dict())
+            self.assertTrue(result.paths.request_path.exists())
+            self.assertTrue(result.paths.payload_path.exists())
+            self.assertTrue(result.paths.report_path.exists())
+            self.assertEqual(len(list((Path(tmp) / "queue").glob("*.json"))), 1)
+
+    def test_run_unit_rejects_required_file_gap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bad_inbox = valid_record()
+            bad_inbox["files_read"] = ["docs/control_plane_workflow.md"]
+            inbox_path = Path(tmp) / "bad_inbox.json"
+            inbox_path.write_text(json.dumps(bad_inbox, indent=2), encoding="utf-8")
+            config = {
+                "artifact_dir": str(Path(tmp) / "artifacts"),
+                "branch": "main",
+                "conclusion_file": "examples/codex_execution_conclusion.example.md",
+                "expected_commit": GOOD_COMMIT,
+                "queue_dir": str(Path(tmp) / "queue"),
+                "repository": "OWNER/REPO",
+                "required_files": FULL_REQUIRED_FILES,
+                "transport": {
+                    "mode": "static_files",
+                    "handoff_record": "examples/valid_handoff_record.json",
+                    "inbox_record": str(inbox_path),
+                },
+            }
+            result = run_automation_unit(config, base_dir=ROOT)
+            self.assertFalse(result.validation.ok)
+            self.assertTrue(any("required_files_not_read" in item for item in result.validation.issues), result.to_dict())
+            self.assertFalse((Path(tmp) / "queue").exists())
+
+    def test_run_unit_rejects_unsupported_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = {
+                "artifact_dir": str(Path(tmp) / "artifacts"),
+                "branch": "main",
+                "conclusion_file": "examples/codex_execution_conclusion.example.md",
+                "expected_commit": GOOD_COMMIT,
+                "queue_dir": str(Path(tmp) / "queue"),
+                "repository": "OWNER/REPO",
+                "required_files": FULL_REQUIRED_FILES,
+                "transport": {"mode": "cdp"},
+            }
+            result = run_automation_unit(config, base_dir=ROOT)
+            self.assertFalse(result.validation.ok)
+            self.assertIn("transport_mode_not_supported_or_not_configured", result.validation.issues)
+            self.assertFalse((Path(tmp) / "queue").exists())
+
+    def test_run_unit_handles_missing_transport_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = {
+                "artifact_dir": str(Path(tmp) / "artifacts"),
+                "branch": "main",
+                "conclusion_file": "examples/codex_execution_conclusion.example.md",
+                "expected_commit": GOOD_COMMIT,
+                "queue_dir": str(Path(tmp) / "queue"),
+                "repository": "OWNER/REPO",
+                "required_files": FULL_REQUIRED_FILES,
+                "transport": {
+                    "mode": "static_files",
+                    "handoff_record": str(Path(tmp) / "missing_handoff.json"),
+                    "inbox_record": "examples/valid_inbox_record.json",
+                },
+            }
+            result = run_automation_unit(config, base_dir=ROOT)
+            self.assertFalse(result.validation.ok)
+            self.assertTrue(any(item.startswith("transport_handoff_missing:") for item in result.validation.issues), result.to_dict())
+            self.assertFalse((Path(tmp) / "queue").exists())
+
+    def test_run_unit_duplicate_enqueue_is_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = json.loads((ROOT / "configs/automation_unit.example.json").read_text(encoding="utf-8"))
+            config["artifact_dir"] = str(Path(tmp) / "artifacts")
+            config["queue_dir"] = str(Path(tmp) / "queue")
+            first = run_automation_unit(config, base_dir=ROOT)
+            second = run_automation_unit(config, base_dir=ROOT)
+            self.assertTrue(first.validation.ok, first.to_dict())
+            self.assertFalse(second.validation.ok)
+            self.assertIn("enqueue:inbox_duplicate_record", second.validation.issues)
+
+    def test_cli_run_unit_static_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = json.loads((ROOT / "configs/automation_unit.example.json").read_text(encoding="utf-8"))
+            config["artifact_dir"] = str(Path(tmp) / "artifacts")
+            config["queue_dir"] = str(Path(tmp) / "queue")
+            config_path = Path(tmp) / "unit.json"
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "scripts/autoscience_cli.py", "run-unit", str(config_path)],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(len(list((Path(tmp) / "queue").glob("*.json"))), 1)
+
+    def test_cli_run_unit_local_command_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = json.loads((ROOT / "configs/automation_unit.local_command.example.json").read_text(encoding="utf-8"))
+            config["artifact_dir"] = str(Path(tmp) / "artifacts")
+            config["queue_dir"] = str(Path(tmp) / "queue")
+            config["transport"]["handoff_record"] = str(Path(tmp) / "artifacts" / "handoff_record.json")
+            config["transport"]["inbox_record"] = str(Path(tmp) / "artifacts" / "inbox_record.json")
+            config_path = Path(tmp) / "unit_local_command.json"
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "scripts/autoscience_cli.py", "run-unit", str(config_path)],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(len(list((Path(tmp) / "queue").glob("*.json"))), 1)
 
 
 if __name__ == "__main__":

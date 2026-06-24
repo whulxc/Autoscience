@@ -6,6 +6,13 @@
   "formal_review_authority": "fixed_chatgpt_web_github_exact_pushed_head",
   "mcp_role": "handoff_monitor_return_only_not_formal_evidence",
   "mcp_selected_as_formal_review_connector": false,
+  "request_sha256": "c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0",
+  "required_files": [
+    "docs/control_plane_workflow.md",
+    "docs/security_model.md",
+    "configs/control_plane_policy.example.json",
+    "configs/scientific_policy.example.json"
+  ],
   "codex_to_web": {
     "composer_state": "empty_after_submit_or_idle",
     "latest_user_turn_contains_codex_conclusion": true,
@@ -27,7 +34,9 @@
     "expected_commit": "0123456789abcdef0123456789abcdef01234567",
     "files_read": [
       "docs/control_plane_workflow.md",
-      "docs/security_model.md"
+      "docs/security_model.md",
+      "configs/control_plane_policy.example.json",
+      "configs/scientific_policy.example.json"
     ],
     "gate_decision": "READY",
     "github_read_not_verified": false,

@@ -29,6 +29,7 @@ from autoscience.workflow import (  # noqa: E402
     consume_inbox_record,
     enqueue_inbox_record,
     render_web_review_request,
+    run_automation_unit,
     summarize_workflow_health,
     summarize_inbox_queue,
     write_review_request,
@@ -54,13 +55,22 @@ def command_validate_policy(args: argparse.Namespace) -> int:
 
 
 def command_validate_inbox(args: argparse.Namespace) -> int:
-    result = validate_inbox_record(load_json(Path(args.record)), expected_commit=args.expected_commit or None)
+    result = validate_inbox_record(
+        load_json(Path(args.record)),
+        expected_commit=args.expected_commit or None,
+        required_files=args.required_file or None,
+    )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
 
 
 def command_validate_handoff(args: argparse.Namespace) -> int:
-    result = validate_handoff_record(load_json(Path(args.record)), expected_commit=args.expected_commit or None)
+    result = validate_handoff_record(
+        load_json(Path(args.record)),
+        expected_commit=args.expected_commit or None,
+        required_files=args.required_file or None,
+        request_sha256=args.request_sha256 or None,
+    )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
 
@@ -130,9 +140,17 @@ def command_workflow_health(args: argparse.Namespace) -> int:
         handoff_record=load_json(Path(args.handoff)) if args.handoff else None,
         inbox_record=load_json(Path(args.inbox)) if args.inbox else None,
         expected_commit=args.expected_commit or None,
+        required_files=args.required_file or None,
+        request_sha256=args.request_sha256 or None,
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
+
+
+def command_run_unit(args: argparse.Namespace) -> int:
+    result = run_automation_unit(load_json(Path(args.config)), base_dir=Path(args.base_dir) if args.base_dir else REPO_ROOT)
+    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    return 0 if result.validation.ok else 2
 
 
 def command_privacy_scan(args: argparse.Namespace) -> int:
@@ -165,11 +183,14 @@ def build_parser() -> argparse.ArgumentParser:
     inbox = sub.add_parser("validate-inbox")
     inbox.add_argument("record")
     inbox.add_argument("--expected-commit", default="")
+    inbox.add_argument("--required-file", action="append")
     inbox.set_defaults(func=command_validate_inbox)
 
     handoff = sub.add_parser("validate-handoff")
     handoff.add_argument("record")
     handoff.add_argument("--expected-commit", default="")
+    handoff.add_argument("--required-file", action="append")
+    handoff.add_argument("--request-sha256", default="")
     handoff.set_defaults(func=command_validate_handoff)
 
     scientific = sub.add_parser("validate-scientific-policy")
@@ -214,7 +235,14 @@ def build_parser() -> argparse.ArgumentParser:
     health.add_argument("--handoff", default="")
     health.add_argument("--inbox", default="")
     health.add_argument("--expected-commit", default="")
+    health.add_argument("--required-file", action="append")
+    health.add_argument("--request-sha256", default="")
     health.set_defaults(func=command_workflow_health)
+
+    run_unit = sub.add_parser("run-unit")
+    run_unit.add_argument("config")
+    run_unit.add_argument("--base-dir", default="")
+    run_unit.set_defaults(func=command_run_unit)
 
     privacy = sub.add_parser("privacy-scan")
     privacy.add_argument("path")

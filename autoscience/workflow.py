@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +24,28 @@ from .control_plane import (
 class ReviewRequest:
     text: str
     payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class AutomationUnitPaths:
+    request_path: Path
+    payload_path: Path
+    report_path: Path
+
+
+@dataclass
+class AutomationUnitResult:
+    validation: ValidationResult
+    paths: AutomationUnitPaths
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = self.validation.to_dict()
+        payload["paths"] = {
+            "request": str(self.paths.request_path),
+            "payload": str(self.paths.payload_path),
+            "report": str(self.paths.report_path),
+        }
+        return payload
 
 
 def utc_now_iso() -> str:
@@ -92,7 +116,12 @@ def enqueue_inbox_record(record: dict[str, Any], queue_dir: Path, *, expected_co
     return ValidationResult(ok=True, details={"target": str(target)})
 
 
-def summarize_inbox_queue(queue_dir: Path, *, expected_commit: str | None = None) -> ValidationResult:
+def summarize_inbox_queue(
+    queue_dir: Path,
+    *,
+    expected_commit: str | None = None,
+    required_files: list[str] | None = None,
+) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
     records: list[dict[str, Any]] = []
@@ -102,7 +131,7 @@ def summarize_inbox_queue(queue_dir: Path, *, expected_commit: str | None = None
         except json.JSONDecodeError:
             issues.append(f"inbox_record_json_invalid:{path}")
             continue
-        result = validate_inbox_record(record, expected_commit=expected_commit)
+        result = validate_inbox_record(record, expected_commit=expected_commit, required_files=required_files)
         if result.issues:
             issues.extend(f"{path}:{item}" for item in result.issues)
         if result.warnings:
@@ -124,9 +153,14 @@ def summarize_inbox_queue(queue_dir: Path, *, expected_commit: str | None = None
     )
 
 
-def consume_inbox_record(record_path: Path, *, expected_commit: str | None = None) -> ValidationResult:
+def consume_inbox_record(
+    record_path: Path,
+    *,
+    expected_commit: str | None = None,
+    required_files: list[str] | None = None,
+) -> ValidationResult:
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    result = validate_inbox_record(record, expected_commit=expected_commit)
+    result = validate_inbox_record(record, expected_commit=expected_commit, required_files=required_files)
     if not result.ok:
         return result
     if bool(record.get("consumed")):
@@ -144,6 +178,8 @@ def summarize_workflow_health(
     handoff_record: dict[str, Any] | None = None,
     inbox_record: dict[str, Any] | None = None,
     expected_commit: str | None = None,
+    required_files: list[str] | None = None,
+    request_sha256: str | None = None,
 ) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
@@ -160,14 +196,187 @@ def summarize_workflow_health(
         warnings.extend(f"scientific_policy:{item}" for item in result.warnings)
         details["scientific_policy_ok"] = result.ok
     if handoff_record is not None:
-        result = validate_handoff_record(handoff_record, expected_commit=expected_commit)
+        result = validate_handoff_record(
+            handoff_record,
+            expected_commit=expected_commit,
+            required_files=required_files,
+            request_sha256=request_sha256,
+        )
         issues.extend(f"handoff:{item}" for item in result.issues)
         warnings.extend(f"handoff:{item}" for item in result.warnings)
         details["handoff_ok"] = result.ok
     if inbox_record is not None:
-        result = validate_inbox_record(inbox_record, expected_commit=expected_commit)
+        result = validate_inbox_record(inbox_record, expected_commit=expected_commit, required_files=required_files)
         issues.extend(f"inbox:{item}" for item in result.issues)
         warnings.extend(f"inbox:{item}" for item in result.warnings)
         details["inbox_ok"] = result.ok
 
     return ValidationResult(ok=not issues, issues=issues, warnings=warnings, details=details)
+
+
+def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None) -> AutomationUnitResult:
+    """Run one reusable automated-research control-plane unit.
+
+    This runner deliberately does not contain a real ChatGPT/CDP/MCP connector.
+    A project-specific private adapter is responsible for transporting the
+    generated review request to Web and writing validated handoff/inbox JSON.
+    The reusable runner owns the deterministic parts: request rendering,
+    policy/scientific-policy checks, handoff validation, inbox enqueue/status,
+    optional consume, and workflow-health reporting.
+    """
+
+    root = base_dir or Path.cwd()
+    artifact_dir = root / str(config.get("artifact_dir") or "runtime/autoscience_unit")
+    queue_dir = root / str(config.get("queue_dir") or "runtime/autoscience_goal_inbox")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    request_path = artifact_dir / "web_review_request.md"
+    payload_path = artifact_dir / "web_review_payload.json"
+    report_path = artifact_dir / "unit_report.json"
+
+    required_keys = ["repository", "branch", "expected_commit", "conclusion_file", "required_files"]
+    missing_keys = [key for key in required_keys if key not in config]
+    if missing_keys:
+        result = ValidationResult(ok=False, issues=[f"config_required_key_missing:{key}" for key in missing_keys])
+        report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+
+    expected_commit = str(config["expected_commit"])
+
+    try:
+        template_text = (root / str(config.get("template_path") or "templates/web_review_request.md")).read_text(encoding="utf-8")
+        conclusion_text = (root / str(config["conclusion_file"])).read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        result = ValidationResult(ok=False, issues=[f"config_input_file_missing:{exc.filename}"])
+        report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+    request = render_web_review_request(
+        template_text,
+        repository=str(config["repository"]),
+        branch=str(config["branch"]),
+        expected_commit=expected_commit,
+        codex_execution_conclusion=conclusion_text,
+        required_files=[str(item) for item in config["required_files"]],
+    )
+    write_review_request(request, request_path, payload_path)
+
+    transport = config.get("transport") or {}
+    mode = transport.get("mode")
+    if mode == "local_command":
+        if bool(config.get("allow_local_transport_command")) is not True:
+            result = ValidationResult(
+                ok=False,
+                issues=["local_transport_command_requires_explicit_allow_flag"],
+                details={"flag": "allow_local_transport_command"},
+            )
+            report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+        command = transport.get("command")
+        if not isinstance(command, list) or not command or not all(isinstance(item, str) and item for item in command):
+            result = ValidationResult(ok=False, issues=["local_transport_command_must_be_nonempty_string_list"])
+            report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+        env = dict(os.environ)
+        env.update(
+            {
+                "AUTOSCIENCE_REVIEW_REQUEST": str(request_path),
+                "AUTOSCIENCE_REVIEW_PAYLOAD": str(payload_path),
+                "AUTOSCIENCE_EXPECTED_COMMIT": expected_commit,
+                "AUTOSCIENCE_ARTIFACT_DIR": str(artifact_dir),
+            }
+        )
+        completed = subprocess.run(
+            command,
+            cwd=root,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if completed.returncode != 0:
+            result = ValidationResult(
+                ok=False,
+                issues=["local_transport_command_failed"],
+                details={
+                    "returncode": completed.returncode,
+                    "stdout_tail": completed.stdout[-2000:],
+                    "stderr_tail": completed.stderr[-2000:],
+                },
+            )
+            report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+    elif mode != "static_files":
+        result = ValidationResult(
+            ok=False,
+            issues=["transport_mode_not_supported_or_not_configured"],
+            details={"supported_modes": ["static_files", "local_command"]},
+        )
+        report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+
+    def read_json_file(config_path: str, issue_prefix: str) -> tuple[dict[str, Any] | None, list[str]]:
+        if not config_path:
+            return None, [f"{issue_prefix}_path_missing"]
+        path = root / str(config_path)
+        try:
+            return json.loads(path.read_text(encoding="utf-8")), []
+        except FileNotFoundError:
+            return None, [f"{issue_prefix}_missing:{path}"]
+        except IsADirectoryError:
+            return None, [f"{issue_prefix}_is_directory:{path}"]
+        except json.JSONDecodeError:
+            return None, [f"{issue_prefix}_json_invalid:{path}"]
+
+    handoff_record, handoff_errors = read_json_file(str(transport.get("handoff_record") or ""), "transport_handoff")
+    inbox_record, inbox_errors = read_json_file(str(transport.get("inbox_record") or ""), "transport_inbox")
+    policy, policy_errors = read_json_file(str(config.get("policy_path") or "configs/control_plane_policy.example.json"), "policy")
+    scientific_policy, scientific_policy_errors = read_json_file(
+        str(config.get("scientific_policy_path") or "configs/scientific_policy.example.json"),
+        "scientific_policy",
+    )
+    json_errors = handoff_errors + inbox_errors + policy_errors + scientific_policy_errors
+    if json_errors:
+        result = ValidationResult(ok=False, issues=json_errors, details={"request": request.payload})
+        report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
+
+    issues: list[str] = []
+    warnings: list[str] = []
+    details: dict[str, Any] = {"request": request.payload}
+
+    health = summarize_workflow_health(
+        policy=policy,
+        scientific_policy=scientific_policy,
+        handoff_record=handoff_record,
+        inbox_record=inbox_record,
+        expected_commit=expected_commit,
+        required_files=request.payload["required_files"],
+        request_sha256=request.payload["request_sha256"],
+    )
+    issues.extend(health.issues)
+    warnings.extend(health.warnings)
+    details["health"] = health.details
+
+    if not issues:
+        enqueue_result = enqueue_inbox_record(inbox_record, queue_dir, expected_commit=expected_commit)
+        issues.extend(f"enqueue:{item}" for item in enqueue_result.issues)
+        warnings.extend(f"enqueue:{item}" for item in enqueue_result.warnings)
+        details["enqueue"] = enqueue_result.details
+
+        queue_result = summarize_inbox_queue(queue_dir, expected_commit=expected_commit, required_files=request.payload["required_files"])
+        issues.extend(f"queue:{item}" for item in queue_result.issues)
+        warnings.extend(f"queue:{item}" for item in queue_result.warnings)
+        details["queue"] = queue_result.details
+
+        if not issues and bool(config.get("consume_after_enqueue")):
+            target = enqueue_result.details.get("target")
+            if target:
+                consume_result = consume_inbox_record(Path(target), expected_commit=expected_commit, required_files=request.payload["required_files"])
+                issues.extend(f"consume:{item}" for item in consume_result.issues)
+                warnings.extend(f"consume:{item}" for item in consume_result.warnings)
+                details["consume"] = consume_result.details
+
+    result = ValidationResult(ok=not issues, issues=issues, warnings=warnings, details=details)
+    report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))

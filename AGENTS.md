@@ -35,6 +35,8 @@ python3 scripts/autoscience_cli.py validate-csv-schema dataset-role examples/dat
 python3 scripts/autoscience_cli.py validate-csv-schema label-authorization examples/label_authorization_matrix.example.csv
 python3 scripts/autoscience_cli.py validate-csv-schema execution-authorization examples/execution_authorization_registry.example.csv
 python3 scripts/autoscience_cli.py workflow-health --policy configs/control_plane_policy.example.json --scientific-policy configs/scientific_policy.example.json --handoff examples/valid_handoff_record.json --inbox examples/valid_inbox_record.json --expected-commit 0123456789abcdef0123456789abcdef01234567
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.local_command.example.json
 python3 scripts/autoscience_cli.py privacy-scan --strict .
 git diff --check
 ```

@@ -48,6 +48,35 @@ result to Codex.
 10. Queue the next goal in the controlled inbox.
 11. Codex validates the inbox item before executing anything.
 
+In this template, the deterministic part of one unit is:
+
+```bash
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.local_command.example.json
+```
+
+The runner:
+
+- renders the Web review request and payload;
+- checks control-plane and scientific policies;
+- reads transport-produced handoff and inbox JSON;
+- validates that the Web response belongs to the latest request;
+- enqueues the next goal;
+- writes a machine-readable unit report.
+
+The public template supports two transport modes:
+
+- `static_files`: read prewritten handoff and inbox JSON records.
+- `local_command`: run a local private adapter with an argument list and no
+  shell expansion, only when `allow_local_transport_command=true`.
+
+A real project should connect its private CDP/browser/MCP adapter by writing
+the same handoff and inbox JSON records. The adapter transports messages; the
+runner decides whether the result is safe to use. The runner fails closed when
+required files are not read, request hashes do not match, transport JSON is
+missing or invalid, stale Web output is detected, or the inbox goal is
+duplicated.
+
 ## Handoff Validation
 
 Run:

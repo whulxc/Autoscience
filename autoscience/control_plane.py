@@ -182,7 +182,12 @@ def validate_policy(policy: dict[str, Any]) -> ValidationResult:
     return ValidationResult(ok=not issues, issues=issues, warnings=warnings)
 
 
-def validate_inbox_record(record: dict[str, Any], *, expected_commit: str | None = None) -> ValidationResult:
+def validate_inbox_record(
+    record: dict[str, Any],
+    *,
+    expected_commit: str | None = None,
+    required_files: list[str] | None = None,
+) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
     commit = expected_commit or str(record.get("expected_commit") or "")
@@ -210,6 +215,11 @@ def validate_inbox_record(record: dict[str, Any], *, expected_commit: str | None
         issues.append("gate_decision_invalid")
     if not isinstance(files_read, list) or not files_read:
         issues.append("files_read_missing")
+    elif required_files:
+        normalized_files_read = {str(item) for item in files_read}
+        for required in required_files:
+            if str(required) not in normalized_files_read:
+                issues.append(f"required_files_not_read:{required}")
     if not goal_command_is_valid(goal):
         issues.append("goal_command_invalid")
 
@@ -231,7 +241,13 @@ def validate_inbox_record(record: dict[str, Any], *, expected_commit: str | None
     )
 
 
-def validate_handoff_record(record: dict[str, Any], *, expected_commit: str | None = None) -> ValidationResult:
+def validate_handoff_record(
+    record: dict[str, Any],
+    *,
+    expected_commit: str | None = None,
+    required_files: list[str] | None = None,
+    request_sha256: str | None = None,
+) -> ValidationResult:
     """Validate one Codex -> Web -> Codex handoff lifecycle.
 
     The handoff bridge is allowed to trigger a fixed Web review, monitor Web
@@ -263,6 +279,18 @@ def validate_handoff_record(record: dict[str, Any], *, expected_commit: str | No
         issues.append("codex_role_invalid")
     if bool(record.get("mcp_selected_as_formal_review_connector")):
         issues.append("mcp_selected_as_formal_review_connector")
+    if request_sha256:
+        if str(record.get("request_sha256") or "") != request_sha256:
+            issues.append("request_sha256_mismatch")
+    if required_files:
+        handoff_required = record.get("required_files") or []
+        if not isinstance(handoff_required, list):
+            issues.append("handoff_required_files_not_list")
+        else:
+            normalized_handoff_required = {str(item) for item in handoff_required}
+            for required in required_files:
+                if str(required) not in normalized_handoff_required:
+                    issues.append(f"handoff_required_file_missing:{required}")
 
     codex_to_web = record.get("codex_to_web") or {}
     if bool(codex_to_web.get("submission_requested")) is not True:
@@ -295,7 +323,7 @@ def validate_handoff_record(record: dict[str, Any], *, expected_commit: str | No
     if not isinstance(inbox_record, dict):
         issues.append("inbox_record_missing")
     else:
-        inbox_result = validate_inbox_record(inbox_record, expected_commit=commit)
+        inbox_result = validate_inbox_record(inbox_record, expected_commit=commit, required_files=required_files)
         issues.extend(f"inbox:{item}" for item in inbox_result.issues)
         warnings.extend(f"inbox:{item}" for item in inbox_result.warnings)
 

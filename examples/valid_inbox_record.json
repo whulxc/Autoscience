@@ -5,7 +5,9 @@
   "expected_commit": "0123456789abcdef0123456789abcdef01234567",
   "files_read": [
     "docs/control_plane_workflow.md",
-    "docs/security_model.md"
+    "docs/security_model.md",
+    "configs/control_plane_policy.example.json",
+    "configs/scientific_policy.example.json"
   ],
   "gate_decision": "READY",
   "github_read_not_verified": false,

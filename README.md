@@ -68,8 +68,26 @@ python3 scripts/autoscience_cli.py validate-csv-schema dataset-role examples/dat
 python3 scripts/autoscience_cli.py validate-csv-schema label-authorization examples/label_authorization_matrix.example.csv
 python3 scripts/autoscience_cli.py validate-csv-schema execution-authorization examples/execution_authorization_registry.example.csv
 python3 scripts/autoscience_cli.py workflow-health --policy configs/control_plane_policy.example.json --scientific-policy configs/scientific_policy.example.json --handoff examples/valid_handoff_record.json --inbox examples/valid_inbox_record.json --expected-commit 0123456789abcdef0123456789abcdef01234567
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json
+python3 scripts/autoscience_cli.py run-unit configs/automation_unit.local_command.example.json
 python3 -m unittest discover -s tests
 ```
+
+`run-unit` is the reusable automation unit runner. It renders the Web review
+request, validates fail-closed control/scientific policy, reads the transport
+handoff and inbox records, validates required-file coverage and request binding,
+enqueues the next goal, and writes a unit report under `runtime/`.
+
+The public template supports:
+
+- `static_files`: read prewritten handoff/inbox JSON records.
+- `local_command`: run a local private adapter without shell expansion only
+  when `allow_local_transport_command=true`.
+
+A real project can add a private CDP, browser, or MCP adapter that writes the
+same handoff and inbox JSON files. The adapter transports messages; the runner
+decides whether the result is usable. Do not commit real session ids, endpoints,
+tokens, transcripts, or private host details to this template.
 
 ## Project-Specific Setup
 

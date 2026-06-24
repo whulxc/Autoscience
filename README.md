@@ -39,6 +39,8 @@ not the formal evidence source.
   template.
 - `skills/automated-research-workflow/SKILL.md`: reusable Codex skill.
 - `docs/`: control-plane workflow, security model, and session policy.
+- `docs/transport_adapter_contract.md`: contract for project-private transport
+  adapters.
 - `templates/web_review_request.md`: sanitized fixed-Web review request template.
 - `examples/`: handoff, inbox, stage, dataset, label, and authorization records.
 - `tests/`: unit tests for validators and privacy scanner.
@@ -88,6 +90,10 @@ A real project can add a private CDP, browser, or MCP adapter that writes the
 same handoff and inbox JSON files. The adapter transports messages; the runner
 decides whether the result is usable. Do not commit real session ids, endpoints,
 tokens, transcripts, or private host details to this template.
+
+See `docs/transport_adapter_contract.md` before writing a project adapter. In
+short: GitHub remains the formal evidence source; the adapter only submits,
+monitors, and returns the Web review decision.
 
 ## Project-Specific Setup
 

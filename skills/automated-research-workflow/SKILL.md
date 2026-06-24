@@ -139,6 +139,8 @@ python3 scripts/autoscience_cli.py workflow-health ...
 Project-specific CDP, browser, or MCP adapters should call into this sequence
 instead of bypassing it. The adapter may transport the prompt and capture the
 response; the validator decides whether the returned result is usable.
+For adapter design details, read `docs/transport_adapter_contract.md` from this
+repository before implementing a project-private transport.
 
 ## Web Session Policy
 

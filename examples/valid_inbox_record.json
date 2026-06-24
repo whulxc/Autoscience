@@ -1,0 +1,17 @@
+{
+  "branch_head_seen": "0123456789abcdef0123456789abcdef01234567",
+  "commit_reviewed": "0123456789abcdef0123456789abcdef01234567",
+  "consumed": false,
+  "expected_commit": "0123456789abcdef0123456789abcdef01234567",
+  "files_read": [
+    "docs/control_plane_workflow.md",
+    "docs/security_model.md"
+  ],
+  "gate_decision": "READY",
+  "github_read_not_verified": false,
+  "github_read_verified": true,
+  "goal_command": "/goal Create and read docs/goals/example_next_goal.md after first running git fetch origin main.",
+  "goal_command_sha256": "7afc95face0a1afaa5b6cadf89d348820034d1c537be9b083e824f2bb8530624",
+  "model_allowed": true,
+  "model_self_report": "GPT-5.5 Thinking"
+}

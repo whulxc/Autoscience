@@ -1,0 +1,10 @@
+[project]
+name = "autoscientce"
+version = "0.1.0"
+description = "Reusable automated research control-plane workflow with safe MCP/Web/GitHub handoff"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

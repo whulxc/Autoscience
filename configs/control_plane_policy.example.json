@@ -1,0 +1,45 @@
+{
+  "version": "v1",
+  "project_name": "<PROJECT_NAME>",
+  "github_repository": "<OWNER>/<REPO>",
+  "branch": "<BRANCH>",
+  "fixed_chatgpt_conversation_id": "<FIXED_CHATGPT_CONVERSATION_ID>",
+  "formal_review_authority": "fixed_chatgpt_web_github_exact_pushed_head",
+  "mcp_role": "read_only_auxiliary_context_only",
+  "codex_role": "sole_executor_after_validating_inbox",
+  "allowed_models": [
+    "gpt 5.5 pro",
+    "thinking"
+  ],
+  "allowed_mcp_tools": [
+    "get_project_overview",
+    "get_current_git_state",
+    "get_workflow_health_summary",
+    "get_required_review_files",
+    "get_execution_conclusion",
+    "get_goal_inbox_status"
+  ],
+  "forbidden_authorities": {
+    "allow_generic_write": false,
+    "allow_edit": false,
+    "allow_apply_patch": false,
+    "allow_bash": false,
+    "allow_shell": false,
+    "allow_terminal": false,
+    "allow_raw_dataset_reads": false,
+    "allow_secret_reads": false,
+    "allow_checkpoint_io": false,
+    "allow_run_directory_io": false,
+    "allow_remote_gpu": false,
+    "allow_training": false,
+    "allow_inference": false,
+    "allow_evaluation": false,
+    "allow_parser_construction": false,
+    "allow_target_construction": false,
+    "allow_split_or_view_construction": false,
+    "allow_long_lived_server": false,
+    "allow_public_tunnel": false,
+    "allow_persisted_endpoint_or_token": false
+  }
+}
+

@@ -79,6 +79,10 @@ python3 -m unittest discover -s tests
 request, validates fail-closed control/scientific policy, reads the transport
 handoff and inbox records, validates required-file coverage and request binding,
 enqueues the next goal, and writes a unit report under `runtime/`.
+For `local_command` transports, the runner captures adapter stdout/stderr as
+bytes, decodes them with UTF-8/UTF-8-SIG/GB18030 fallback, and stores log tails
+under the runtime artifact directory. A project adapter's platform-specific
+output encoding must not break an otherwise valid Web review handoff.
 
 The public template supports:
 
@@ -99,6 +103,11 @@ In practical use, the user can keep watching one Codex CLI window and one fixed
 ChatGPT Web review conversation. Codex still commits evidence to GitHub; the
 private adapter only reduces manual copy/paste and blind waiting by moving the
 Codex conclusion to Web and bringing the verified review result back to Codex.
+
+Before any workflow declares a goal complete, perform a requirement-by-
+requirement completion audit against current evidence. A green control-plane
+unit proves instruction handoff; it does not prove training authorization,
+model acceptance, dataset readiness, or scientific stage acceptance.
 
 ## Project-Specific Setup
 

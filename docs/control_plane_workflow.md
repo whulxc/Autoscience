@@ -69,6 +69,9 @@ The public template supports two transport modes:
 - `static_files`: read prewritten handoff and inbox JSON records.
 - `local_command`: run a local private adapter with an argument list and no
   shell expansion, only when `allow_local_transport_command=true`.
+  The runner captures adapter stdout/stderr as bytes, writes decoded log tails
+  under `runtime/`, and tolerates non-UTF-8 diagnostic output from Windows,
+  PowerShell, WSL, or browser/CDP helper processes.
 
 A real project should connect its private CDP/browser/MCP adapter by writing
 the same handoff and inbox JSON records. The adapter transports messages; the
@@ -123,6 +126,23 @@ A handoff is valid only when:
 
 If a unit only proves control-plane readiness, stop there. Do not convert
 control-plane readiness into training, data access, or stage acceptance.
+
+## Completion Audit
+
+Before declaring an automation objective complete, audit the original objective
+against current evidence item by item:
+
+- list each explicit requirement, named artifact, command, gate, invariant, and
+  deliverable;
+- identify the authoritative evidence for that item, such as pushed commits,
+  Web reviews, unit reports, tests, policy files, or rendered artifacts;
+- mark uncertain, indirect, stale, or old-commit evidence as not complete;
+- keep workflow readiness, scientific readiness, training authorization, model
+  acceptance, and stage acceptance as separate conclusions.
+
+A completed `run-unit` result is evidence for the handoff/control plane only.
+It is not proof that a scientific model was trained, a dataset is usable, a
+stage was accepted, or a remote job may start.
 
 ## Scientific Authorization Layer
 

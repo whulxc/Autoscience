@@ -69,6 +69,20 @@ human-readable summary, as long as they are lightweight and contain no secrets.
 - goal text hash matches;
 - the item is not already consumed.
 
+## Local Command Output
+
+When the reusable runner executes a project-private `local_command` adapter, it
+captures stdout/stderr as bytes and decodes them with UTF-8/UTF-8-SIG/GB18030
+fallback before writing runtime log tails. This is intentional: browser/CDP
+helpers often run across WSL, Windows Python, PowerShell, or other shells, and
+their diagnostic output may not be valid UTF-8. A log-decoding mismatch must be
+treated as a local transport compatibility issue, not as a Web, GitHub, model,
+or prompt-delivery failure.
+
+Project adapters should still keep stdout/stderr lightweight and free of
+secrets. Runtime log tails are for local debugging and should remain under
+ignored runtime artifact directories.
+
 ## Adapter Modes
 
 Recommended modes:

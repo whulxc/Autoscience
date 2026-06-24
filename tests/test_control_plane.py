@@ -419,6 +419,45 @@ class ControlPlaneTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(len(list((Path(tmp) / "queue").glob("*.json"))), 1)
 
+    def test_run_unit_local_command_tolerates_non_utf8_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            adapter = tmp_path / "non_utf8_adapter.py"
+            adapter.write_text(
+                """#!/usr/bin/env python3
+from __future__ import annotations
+import os
+import shutil
+import sys
+from pathlib import Path
+
+artifact_dir = Path(os.environ["AUTOSCIENCE_ARTIFACT_DIR"])
+root = Path.cwd()
+artifact_dir.mkdir(parents=True, exist_ok=True)
+shutil.copyfile(root / "examples/valid_handoff_record.json", artifact_dir / "handoff_record.json")
+shutil.copyfile(root / "examples/valid_inbox_record.json", artifact_dir / "inbox_record.json")
+# bytes([0xD7]) before a newline is intentionally invalid UTF-8.
+sys.stdout.buffer.write(b"adapter stdout before invalid byte\\n" + bytes([0xD7]) + b"\\n")
+sys.stderr.buffer.write(b"adapter stderr before invalid byte\\n" + bytes([0xD7]) + b"\\n")
+""",
+                encoding="utf-8",
+            )
+            config = json.loads((ROOT / "configs/automation_unit.local_command.example.json").read_text(encoding="utf-8"))
+            config["artifact_dir"] = str(tmp_path / "artifacts")
+            config["queue_dir"] = str(tmp_path / "queue")
+            config["transport"]["command"] = [sys.executable, str(adapter)]
+            config["transport"]["handoff_record"] = str(tmp_path / "artifacts" / "handoff_record.json")
+            config["transport"]["inbox_record"] = str(tmp_path / "artifacts" / "inbox_record.json")
+
+            result = run_automation_unit(config, base_dir=ROOT)
+
+            self.assertTrue(result.validation.ok, result.to_dict())
+            stdout_log = tmp_path / "artifacts" / "local_transport_stdout.txt"
+            stderr_log = tmp_path / "artifacts" / "local_transport_stderr.txt"
+            self.assertIn("adapter stdout before invalid byte", stdout_log.read_text(encoding="utf-8"))
+            self.assertIn("adapter stderr before invalid byte", stderr_log.read_text(encoding="utf-8"))
+            self.assertEqual(len(list((tmp_path / "queue").glob("*.json"))), 1)
+
 
 if __name__ == "__main__":
     raise SystemExit(unittest.main())

@@ -52,6 +52,21 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def decode_subprocess_output(data: bytes | str | None) -> str:
+    """Decode adapter output without letting platform encoding break a unit."""
+
+    if data is None:
+        return ""
+    if isinstance(data, str):
+        return data
+    for encoding in ("utf-8", "utf-8-sig", "gb18030"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
 def render_web_review_request(
     template_text: str,
     *,
@@ -262,6 +277,7 @@ def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None)
 
     transport = config.get("transport") or {}
     mode = transport.get("mode")
+    transport_details: dict[str, Any] = {"mode": str(mode or "")}
     if mode == "local_command":
         if bool(config.get("allow_local_transport_command")) is not True:
             result = ValidationResult(
@@ -289,20 +305,30 @@ def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None)
             command,
             cwd=root,
             env=env,
-            text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
+        )
+        stdout_text = decode_subprocess_output(completed.stdout)
+        stderr_text = decode_subprocess_output(completed.stderr)
+        stdout_log = artifact_dir / "local_transport_stdout.txt"
+        stderr_log = artifact_dir / "local_transport_stderr.txt"
+        stdout_log.write_text(stdout_text[-12000:], encoding="utf-8")
+        stderr_log.write_text(stderr_text[-12000:], encoding="utf-8")
+        transport_details.update(
+            {
+                "returncode": completed.returncode,
+                "stdout_tail_path": str(stdout_log),
+                "stderr_tail_path": str(stderr_log),
+                "stdout_tail": stdout_text[-2000:],
+                "stderr_tail": stderr_text[-2000:],
+            }
         )
         if completed.returncode != 0:
             result = ValidationResult(
                 ok=False,
                 issues=["local_transport_command_failed"],
-                details={
-                    "returncode": completed.returncode,
-                    "stdout_tail": completed.stdout[-2000:],
-                    "stderr_tail": completed.stderr[-2000:],
-                },
+                details={"transport": transport_details},
             )
             report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
             return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
@@ -343,7 +369,7 @@ def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None)
 
     issues: list[str] = []
     warnings: list[str] = []
-    details: dict[str, Any] = {"request": request.payload}
+    details: dict[str, Any] = {"request": request.payload, "transport": transport_details}
 
     health = summarize_workflow_health(
         policy=policy,

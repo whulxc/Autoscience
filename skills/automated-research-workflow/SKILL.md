@@ -128,8 +128,10 @@ allowed to produce those records. It renders the review request, validates
 policies, validates request hash, required-file coverage, handoff/inbox,
 enqueues the next goal, and writes a unit report. Public templates should use
 `static_files`; project-private adapters may use `local_command` with no shell
-expansion and explicit `allow_local_transport_command=true`. For lower-level
-debugging, run the component commands:
+expansion and explicit `allow_local_transport_command=true`. The runner
+captures adapter stdout/stderr as bytes and decodes with tolerant fallback so a
+Windows/WSL/browser-helper log encoding mismatch cannot break an otherwise
+valid handoff. For lower-level debugging, run the component commands:
 
 ```bash
 python3 scripts/autoscience_cli.py make-review-request ...
@@ -146,6 +148,16 @@ instead of bypassing it. The adapter may transport the prompt and capture the
 response; the validator decides whether the returned result is usable.
 For adapter design details, read `docs/transport_adapter_contract.md` from this
 repository before implementing a project-private transport.
+
+## Completion Audit
+
+Before declaring a long-running automation goal complete, audit the original
+objective against current evidence requirement by requirement. Current pushed
+commits, Web reviews, unit reports, policy files, tests, and inbox records can
+prove specific requirements; old commits, stale reviews, plausible intent, or a
+green control-plane check cannot prove broader scientific completion. Keep
+control-plane readiness, scientific readiness, training authorization, model
+acceptance, and stage acceptance as separate states.
 
 ## Web Session Policy
 

@@ -1,0 +1,40 @@
+{
+  "bridge_role": "codex_web_handoff_trigger_monitor_return",
+  "codex_role": "sole_executor_after_validating_inbox",
+  "expected_commit": "0123456789abcdef0123456789abcdef01234567",
+  "formal_material_source": "github_exact_pushed_head",
+  "formal_review_authority": "fixed_chatgpt_web_github_exact_pushed_head",
+  "mcp_role": "handoff_monitor_return_only_not_formal_evidence",
+  "mcp_selected_as_formal_review_connector": false,
+  "codex_to_web": {
+    "composer_state": "empty_after_submit_or_idle",
+    "latest_user_turn_contains_codex_conclusion": true,
+    "latest_user_turn_contains_commit": true,
+    "prompt_delivery_verified": true,
+    "submission_requested": true
+  },
+  "web_to_codex": {
+    "generation_state": "complete",
+    "response_after_latest_request": true,
+    "review_artifact_path": "research_context/web_reviews/chatgpt_web_review_example.md",
+    "stale_or_prior_commit_output": false,
+    "structured_review_blocks_present": true
+  },
+  "inbox_record": {
+    "branch_head_seen": "0123456789abcdef0123456789abcdef01234567",
+    "commit_reviewed": "0123456789abcdef0123456789abcdef01234567",
+    "consumed": false,
+    "expected_commit": "0123456789abcdef0123456789abcdef01234567",
+    "files_read": [
+      "docs/control_plane_workflow.md",
+      "docs/security_model.md"
+    ],
+    "gate_decision": "READY",
+    "github_read_not_verified": false,
+    "github_read_verified": true,
+    "goal_command": "/goal Create and read docs/goals/example_next_goal.md after first running git fetch origin main.",
+    "goal_command_sha256": "7afc95face0a1afaa5b6cadf89d348820034d1c537be9b083e824f2bb8530624",
+    "model_allowed": true,
+    "model_self_report": "GPT-5.5 Thinking"
+  }
+}

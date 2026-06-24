@@ -10,6 +10,17 @@ Branch: <BRANCH>
 Expected BRANCH_HEAD_SEEN: <40_HEX_COMMIT>
 Expected COMMIT_REVIEWED: <40_HEX_COMMIT>
 
+[HANDOFF_CONTEXT_BEGIN]
+GitHub is the formal evidence source for this review.
+MCP/bridge automation may have delivered this prompt and may later carry your
+structured answer back to Codex, but MCP is not the formal evidence source and
+does not authorize execution.
+
+If GitHub and MCP are mutually exclusive in the ChatGPT Web connector UI, use
+GitHub for this formal review. Do not rely on MCP-only material to verify the
+commit or required files.
+[HANDOFF_CONTEXT_END]
+
 [CODEX_EXECUTION_CONCLUSION_BEGIN]
 Plain-language conclusion:
 <EXECUTION_CONCLUSION>
@@ -17,7 +28,7 @@ Plain-language conclusion:
 Required boundaries:
 - GitHub exact pushed HEAD remains the formal evidence source.
 - The fixed ChatGPT Web review session remains the formal review entry.
-- MCP is read-only auxiliary context only.
+- MCP/bridge automation is only the submit-monitor-return layer.
 - The controlled inbox may contain only a verified review decision and next `/goal`.
 - Codex or the local executor remains the only executor.
 - No write, bash, raw data, checkpoint, remote GPU, training, inference, evaluation, parser, target, split, or view authority is granted.
@@ -25,8 +36,7 @@ Required boundaries:
 
 Required files to read through GitHub:
 
-- <REQUIRED_FILE_1>
-- <REQUIRED_FILE_2>
+<REQUIRED_FILES_LIST>
 
 Return exactly these blocks:
 
@@ -41,6 +51,7 @@ CODEX_CONCLUSION_READ=
 CODEX_CONCLUSION_ACCEPTED_BY_REVIEW=
 CONTROL_PLANE_BOUNDARIES_ACCEPTED=
 FIXED_WEB_GITHUB_REVIEW_AUTHORITY_PRESERVED=
+MCP_NOT_USED_AS_FORMAL_EVIDENCE_SOURCE=
 GENERIC_WRITE_OR_BASH_AUTHORIZED=False
 TRAINING_OR_SCIENTIFIC_STAGE_AUTHORIZED=False
 CODEX_CONCLUSION_REVIEW_NOTES=
@@ -63,4 +74,3 @@ Explain the decision in plain language.
 [GOAL_BEGIN]
 /goal Create and read docs/goals/<NEXT_GOAL_FILE>.md ...
 [GOAL_END]
-

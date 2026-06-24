@@ -1,6 +1,6 @@
 ---
 name: automated-research-workflow
-description: Use for reusable automated research control-plane work: Codex or executor units, GitHub exact-HEAD handoff, fixed ChatGPT Web review, safe MCP read-only context, controlled inbox goal validation, workflow health, and separating control-plane readiness from scientific training authorization.
+description: Use for reusable automated research control-plane work: Codex or executor units, GitHub exact-HEAD evidence, fixed ChatGPT Web review, MCP/bridge submit-monitor-return handoff, controlled inbox goal validation, workflow health, and separating control-plane readiness from scientific training authorization.
 ---
 
 # Automated Research Workflow
@@ -8,17 +8,29 @@ description: Use for reusable automated research control-plane work: Codex or ex
 Use this skill when coordinating automated research work that must be reviewed
 through a fixed Web model and GitHub exact pushed commits.
 
+Human-readable role split:
+
+- GitHub is the formal evidence source.
+- ChatGPT Web is the reviewer.
+- MCP/bridge automation submits the Codex conclusion to Web, monitors Web
+  delivery/generation, and returns Web's structured result.
+- Codex is the only executor after validating the returned inbox record.
+
 ## Core Loop
 
 1. Execute one bounded unit.
 2. Commit and push lightweight evidence.
-3. Ask the fixed Web review session to self-report its model.
-4. Require GitHub verification of the exact pushed commit.
-5. Promote only a review with matching branch head, matching reviewed commit,
+3. Use the bridge to submit the Codex conclusion, expected commit, required
+   files, and gate question to the fixed Web review session.
+4. Ask the fixed Web review session to self-report its model.
+5. Require GitHub verification of the exact pushed commit.
+6. Poll for prompt delivery, composer state, generation state, and the latest
+   assistant response after the current request.
+7. Promote only a review with matching branch head, matching reviewed commit,
    full required-file coverage, accepted Codex conclusion, valid gate, Markdown
    explanation, and next `/goal`.
-6. Queue the next goal in a controlled inbox.
-7. Validate inbox provenance before execution.
+8. Queue the next goal in a controlled inbox.
+9. Validate inbox provenance before execution.
 
 ## Required Roles
 
@@ -36,11 +48,39 @@ Keep these states separate:
 - training authorization;
 - model or stage acceptance.
 
-## MCP Policy
+Before claiming training, model acceptance, stage acceptance, data readiness, or
+evaluation authority, require project-specific registries:
 
-MCP is read-only auxiliary context only. Never expose generic write, edit,
-apply-patch, bash, shell, terminal, raw data, checkpoint, remote GPU, training,
-inference, evaluation, parser, target, split, or view capabilities through MCP.
+- stage state registry;
+- dataset role matrix;
+- label authorization matrix;
+- execution authorization registry.
+
+Run `validate-scientific-policy` and the relevant `validate-csv-schema` checks.
+Reusable templates must keep all scientific authorization flags false by
+default. A Web/MCP/control-plane `READY` does not grant training, remote jobs,
+parser/target/view/split construction, checkpoint I/O, final-test reopening, or
+evaluation-only label use for model selection.
+
+## MCP/Bridge Policy
+
+MCP/bridge automation is the submit-monitor-return layer between Codex and
+ChatGPT Web. It is not the formal evidence source and not an executor.
+
+For formal review, GitHub exact pushed HEAD remains authoritative. If ChatGPT
+Web forces a choice between GitHub and an MCP app, choose GitHub for formal
+review. Use MCP/bridge automation outside that Web-side evidence path to:
+
+- stage or submit the review prompt;
+- verify the latest user turn contains the expected commit and Codex conclusion;
+- monitor composer/input state and generation state;
+- capture the latest assistant response after the current request;
+- stage a controlled inbox entry containing only the review decision and next
+  `/goal`.
+
+Never expose generic write, edit, apply-patch, bash, shell, terminal, raw data,
+checkpoint, remote GPU, training, inference, evaluation, parser, target, split,
+or view capabilities through MCP.
 
 Do not start long-running servers, public tunnels, connector registration, or
 persisted endpoint/token material unless a project-specific current-HEAD Web
@@ -65,6 +105,25 @@ Codex must verify:
 - review artifact and payload metadata are bound to the fixed session;
 - item is not stale, substituted, duplicated, or already consumed.
 
+Run `python3 scripts/autoscience_cli.py validate-handoff <record.json>` before
+trusting a bridge return. This check is separate from
+`validate-inbox`: handoff validation proves that the prompt was delivered and
+the Web answer belongs to the latest request; inbox validation proves the
+returned goal is safe to execute.
+
+Use the reusable CLI sequence:
+
+```bash
+python3 scripts/autoscience_cli.py make-review-request ...
+python3 scripts/autoscience_cli.py validate-handoff <handoff.json>
+python3 scripts/autoscience_cli.py validate-inbox <inbox.json>
+python3 scripts/autoscience_cli.py workflow-health ...
+```
+
+Project-specific CDP, browser, or MCP adapters should call into this sequence
+instead of bypassing it. The adapter may transport the prompt and capture the
+response; the validator decides whether the returned result is usable.
+
 ## Web Session Policy
 
 Use a fixed Web review session for a workflow track. For formal scientific
@@ -86,4 +145,3 @@ Stop when:
   security confirmation;
 - a goal would grant write, bash, data, checkpoint, remote GPU, training, or
   scientific-stage authority without a separate explicit review.
-

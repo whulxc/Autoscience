@@ -1,0 +1,28 @@
+{
+  "version": "v1",
+  "gate_scope_required": true,
+  "plain_language_status_required": true,
+  "required_registries": [
+    "stage_state_registry",
+    "dataset_role_matrix",
+    "label_authorization_matrix",
+    "execution_authorization_registry"
+  ],
+  "authorization_flags": {
+    "control_plane_ready_grants_scientific_authorization": false,
+    "training_authorized": false,
+    "remote_job_allowed": false,
+    "parser_converter_authorized": false,
+    "target_construction_authorized": false,
+    "timestamp_join_authorized": false,
+    "view_or_split_construction_authorized": false,
+    "training_config_authorized": false,
+    "inference_or_evaluation_authorized": false,
+    "checkpoint_io_authorized": false,
+    "final_once_reopening_authorized": false,
+    "new_trained_model_acceptance_authorized": false,
+    "stage_reactivation_authorized": false,
+    "next_stage_start_authorized": false,
+    "eval_only_label_selection_use_authorized": false
+  }
+}

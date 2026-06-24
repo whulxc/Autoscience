@@ -1,0 +1,6 @@
+authorization,allowed,scope,evidence
+training,false,not_authorized_by_control_plane_ready,configs/scientific_policy.example.json
+remote_job,false,not_authorized_by_control_plane_ready,configs/scientific_policy.example.json
+parser_converter,false,requires_project_specific_reviewed_goal,configs/scientific_policy.example.json
+checkpoint_io,false,requires_project_specific_reviewed_goal,configs/scientific_policy.example.json
+eval_only_label_selection_use,false,requires_project_specific_reviewed_goal,configs/scientific_policy.example.json

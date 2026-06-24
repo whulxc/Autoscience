@@ -13,8 +13,10 @@ Autoscientce is designed to fail closed.
   split construction, or view construction.
 - Do not commit long-lived endpoints, connector URLs, tunnel URLs, tokens,
   secrets, credentials, private hostnames, or private IP addresses.
-- Treat MCP as read-only auxiliary context; GitHub exact pushed HEAD remains
-  the formal evidence source.
+- Treat MCP/bridge automation as submit-monitor-return infrastructure; GitHub
+  exact pushed HEAD remains the formal evidence source.
+- If ChatGPT Web forces a choice between GitHub and an MCP app, choose GitHub
+  for formal review. MCP must not replace GitHub commit/file verification.
 - Treat the fixed Web review as the review entry; Codex or the local executor
   remains the only executor.
 
@@ -26,10 +28,17 @@ Autoscientce is designed to fail closed.
   attack surface.
 - Goal injection: a malicious or stale goal could be queued if provenance
   checks are weakened.
+- Authorization collapse: control-plane READY can be misread as training,
+  model, dataset, or stage acceptance.
 - Context leakage: review transcripts and request files can contain private
   project state even when they are not raw datasets.
 - Stale review promotion: an older READY block can be mistaken for the current
   commit if polling is not bound to the latest user turn.
+- Connector-role confusion: MCP can be mistaken for the formal material source
+  even though it should only trigger, monitor, and return review messages.
+- Blind waiting: Codex can keep polling even though the Web prompt was never
+  sent, generation already stopped, or the latest answer is for an older
+  request.
 
 ## Required Mitigations
 
@@ -38,6 +47,11 @@ Autoscientce is designed to fail closed.
   artifact, required-file list, gate decision, goal text, and goal hash.
 - Reject stale commits, missing required files, disallowed models, unverified
   GitHub reads, and substituted goals.
+- Validate each handoff lifecycle: prompt delivered, composer safe, latest
+  response bound to the current request, structured blocks present, and inbox
+  record valid.
+- Require project-specific scientific registries for stage state, dataset
+  roles, label authorization, and execution authorization. Keep all scientific
+  authorization flags false in reusable templates.
 - Run strict privacy scans before publishing reusable templates.
 - Store real project identifiers only in private instance configuration.
-

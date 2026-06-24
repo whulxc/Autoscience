@@ -5,8 +5,23 @@
   "branch": "<BRANCH>",
   "fixed_chatgpt_conversation_id": "<FIXED_CHATGPT_CONVERSATION_ID>",
   "formal_review_authority": "fixed_chatgpt_web_github_exact_pushed_head",
-  "mcp_role": "read_only_auxiliary_context_only",
+  "formal_material_source": "github_exact_pushed_head",
+  "bridge_role": "codex_web_handoff_trigger_monitor_return",
+  "mcp_role": "handoff_monitor_return_only_not_formal_evidence",
+  "mcp_can_replace_github_review": false,
   "codex_role": "sole_executor_after_validating_inbox",
+  "chatgpt_connector_policy": {
+    "formal_review_connector": "github",
+    "mcp_connector_for_formal_review": false,
+    "if_github_and_mcp_are_mutually_exclusive": "choose_github_for_formal_review",
+    "mcp_allowed_use": [
+      "submit_or_stage_review_prompt",
+      "monitor_prompt_delivery",
+      "monitor_generation_state",
+      "capture_latest_response_after_current_request",
+      "stage_controlled_inbox_record"
+    ]
+  },
   "allowed_models": [
     "gpt 5.5 pro",
     "thinking"
@@ -42,4 +57,3 @@
     "allow_persisted_endpoint_or_token": false
   }
 }
-

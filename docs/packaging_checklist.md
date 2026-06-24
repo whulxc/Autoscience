@@ -9,8 +9,17 @@ Before publishing or sharing an automated-research workflow template:
 - Remove Web payload JSON, raw transcript text, connector metadata, endpoint
   URLs, tunnel URLs, tokens, and secrets.
 - Keep policy defaults disabled or read-only.
+- Keep scientific authorization defaults false; include placeholder stage,
+  dataset, label, and execution authorization registries.
 - Include tests for model policy, commit equality, goal hash, stale commit,
-  substituted goal, and privacy scanning.
+  substituted goal, handoff delivery, stale Web output, MCP-as-formal-source
+  rejection, and privacy scanning.
+- Run `python3 scripts/autoscience_cli.py validate-policy configs/control_plane_policy.example.json`.
+- Run `python3 scripts/autoscience_cli.py validate-scientific-policy configs/scientific_policy.example.json`.
+- Run `python3 scripts/autoscience_cli.py validate-handoff examples/valid_handoff_record.json`.
+- Run `python3 scripts/autoscience_cli.py validate-inbox examples/valid_inbox_record.json`.
+- Run all `validate-csv-schema` checks for example registries.
+- Run `python3 scripts/autoscience_cli.py workflow-health ...` with the
+  template policy, scientific policy, handoff, inbox, and expected commit.
 - Run `python3 scripts/autoscience_cli.py privacy-scan --strict .`.
 - Run `python3 -m unittest discover -s tests`.
-

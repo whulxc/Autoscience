@@ -24,6 +24,21 @@ ALLOWED_COMPOSER_STATES = {
     "not_applicable_verified_transcript",
 }
 ALLOWED_GENERATION_STATES = {"complete", "stopped", "ready_for_review_capture"}
+PROVENANCE_PATH_PREFIXES = (
+    "research_context/web_reviews/",
+    "reviews/",
+    "examples/",
+    "runtime/",
+)
+REQUIRED_REVIEW_PROVENANCE_FIELDS = {
+    "source_review_path",
+    "source_review_sha256",
+    "review_payload_path",
+    "review_payload_sha256",
+    "fixed_review_session_binding",
+    "request_sha256",
+    "goal_command_sha256",
+}
 FORBIDDEN_TRUE_FLAGS = {
     "allow_generic_write",
     "allow_edit",
@@ -152,6 +167,58 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sha256_hex_is_valid(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-fA-F]{64}", value or ""))
+
+
+def relative_path_is_safe(value: str) -> bool:
+    path = Path(value or "")
+    return bool(value) and not path.is_absolute() and ".." not in path.parts
+
+
+def validate_inbox_provenance_fields(record: dict[str, Any], *, require_provenance: bool = False) -> ValidationResult:
+    issues: list[str] = []
+    warnings: list[str] = []
+    provenance_present = any(field in record for field in REQUIRED_REVIEW_PROVENANCE_FIELDS)
+    if not (require_provenance or provenance_present):
+        return ValidationResult(ok=True)
+
+    missing = sorted(field for field in REQUIRED_REVIEW_PROVENANCE_FIELDS if not record.get(field))
+    for field in missing:
+        issues.append(f"review_provenance_missing:{field}")
+
+    source_review_path = str(record.get("source_review_path") or "")
+    review_payload_path = str(record.get("review_payload_path") or "")
+    fixed_binding = str(record.get("fixed_review_session_binding") or "")
+
+    if source_review_path:
+        if not relative_path_is_safe(source_review_path):
+            issues.append("source_review_path_not_safe_relative")
+        if not source_review_path.endswith(".md"):
+            issues.append("source_review_path_must_be_markdown")
+        if not source_review_path.startswith(PROVENANCE_PATH_PREFIXES):
+            warnings.append("source_review_path_not_standard_prefix")
+    if review_payload_path:
+        if not relative_path_is_safe(review_payload_path):
+            issues.append("review_payload_path_not_safe_relative")
+        if not review_payload_path.endswith(".json"):
+            issues.append("review_payload_path_must_be_json")
+        if not review_payload_path.startswith(PROVENANCE_PATH_PREFIXES):
+            warnings.append("review_payload_path_not_standard_prefix")
+
+    for field in ("source_review_sha256", "review_payload_sha256", "request_sha256", "goal_command_sha256"):
+        value = str(record.get(field) or "")
+        if value and not sha256_hex_is_valid(value):
+            issues.append(f"review_provenance_hash_invalid:{field}")
+
+    if fixed_binding:
+        normalized_binding = normalize_model_text(fixed_binding)
+        if "active tab" in normalized_binding or normalized_binding == "active_tab":
+            issues.append("fixed_review_session_binding_must_not_be_active_tab")
+
+    return ValidationResult(ok=not issues, issues=issues, warnings=warnings)
+
+
 def validate_policy(policy: dict[str, Any]) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
@@ -187,6 +254,8 @@ def validate_inbox_record(
     *,
     expected_commit: str | None = None,
     required_files: list[str] | None = None,
+    request_sha256: str | None = None,
+    require_provenance: bool = False,
 ) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
@@ -224,8 +293,20 @@ def validate_inbox_record(
         issues.append("goal_command_invalid")
 
     recorded_goal_hash = str(record.get("goal_command_sha256") or "")
+    if require_provenance and not recorded_goal_hash:
+        issues.append("goal_command_hash_missing")
     if recorded_goal_hash and recorded_goal_hash != sha256_text(goal):
         issues.append("goal_command_hash_mismatch")
+    recorded_request_hash = str(record.get("request_sha256") or "")
+    if request_sha256:
+        if recorded_request_hash != request_sha256:
+            issues.append("request_sha256_mismatch")
+    elif recorded_request_hash and not sha256_hex_is_valid(recorded_request_hash):
+        issues.append("request_sha256_invalid")
+
+    provenance_result = validate_inbox_provenance_fields(record, require_provenance=require_provenance)
+    issues.extend(provenance_result.issues)
+    warnings.extend(provenance_result.warnings)
     if bool(record.get("consumed")):
         warnings.append("record_already_consumed")
 
@@ -247,6 +328,7 @@ def validate_handoff_record(
     expected_commit: str | None = None,
     required_files: list[str] | None = None,
     request_sha256: str | None = None,
+    require_provenance: bool = False,
 ) -> ValidationResult:
     """Validate one Codex -> Web -> Codex handoff lifecycle.
 
@@ -316,14 +398,22 @@ def validate_handoff_record(
     if bool(web_to_codex.get("stale_or_prior_commit_output")):
         issues.append("stale_or_prior_commit_output")
     review_artifact_path = str(web_to_codex.get("review_artifact_path") or "")
-    if review_artifact_path and not review_artifact_path.startswith("research_context/web_reviews/"):
+    if review_artifact_path and not review_artifact_path.startswith(PROVENANCE_PATH_PREFIXES):
         warnings.append("review_artifact_path_is_not_standard_web_reviews_path")
 
     inbox_record = record.get("inbox_record")
     if not isinstance(inbox_record, dict):
         issues.append("inbox_record_missing")
     else:
-        inbox_result = validate_inbox_record(inbox_record, expected_commit=commit, required_files=required_files)
+        if review_artifact_path and str(inbox_record.get("source_review_path") or "") and str(inbox_record["source_review_path"]) != review_artifact_path:
+            issues.append("review_artifact_path_mismatch_with_inbox_source_review_path")
+        inbox_result = validate_inbox_record(
+            inbox_record,
+            expected_commit=commit,
+            required_files=required_files,
+            request_sha256=request_sha256,
+            require_provenance=require_provenance,
+        )
         issues.extend(f"inbox:{item}" for item in inbox_result.issues)
         warnings.extend(f"inbox:{item}" for item in inbox_result.warnings)
 

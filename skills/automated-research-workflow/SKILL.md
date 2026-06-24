@@ -107,7 +107,10 @@ Codex must verify:
 - valid gate;
 - `/goal` references `docs/goals/`;
 - goal text hash matches;
-- review artifact and payload metadata are bound to the fixed session;
+- request hash matches the rendered review request;
+- source Web review artifact path and SHA-256 are present;
+- review payload path and SHA-256 are present;
+- fixed review session binding is present and is not the user's active tab;
 - item is not stale, substituted, duplicated, or already consumed.
 
 Run `python3 scripts/autoscience_cli.py validate-handoff <record.json>` before
@@ -125,7 +128,8 @@ python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json
 Use `run-unit` for the full deterministic unit when a project has already
 produced transport handoff/inbox JSON, or when a private local adapter is
 allowed to produce those records. It renders the review request, validates
-policies, validates request hash, required-file coverage, handoff/inbox,
+policies, validates request hash, required-file coverage, review artifact
+provenance, review payload provenance, fixed-session binding, handoff/inbox,
 enqueues the next goal, and writes a unit report. Public templates should use
 `static_files`; project-private adapters may use `local_command` with no shell
 expansion and explicit `allow_local_transport_command=true`. The runner

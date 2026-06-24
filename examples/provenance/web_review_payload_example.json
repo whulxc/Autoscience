@@ -1,0 +1,8 @@
+{
+  "branch": "main",
+  "bridge_role": "codex_web_handoff_trigger_monitor_return",
+  "expected_commit": "0123456789abcdef0123456789abcdef01234567",
+  "formal_material_source": "github_exact_pushed_head",
+  "repository": "OWNER/REPO",
+  "request_sha256": "c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0"
+}

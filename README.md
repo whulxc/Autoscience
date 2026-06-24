@@ -42,7 +42,8 @@ not the formal evidence source.
 - `docs/transport_adapter_contract.md`: contract for project-private transport
   adapters.
 - `templates/web_review_request.md`: sanitized fixed-Web review request template.
-- `examples/`: handoff, inbox, stage, dataset, label, and authorization records.
+- `examples/`: handoff, inbox, review-provenance, stage, dataset, label, and
+  authorization records.
 - `tests/`: unit tests for validators and privacy scanner.
 
 ## Safety Defaults
@@ -63,13 +64,13 @@ not the formal evidence source.
 python3 scripts/autoscience_cli.py privacy-scan .
 python3 scripts/autoscience_cli.py validate-policy configs/control_plane_policy.example.json
 python3 scripts/autoscience_cli.py validate-scientific-policy configs/scientific_policy.example.json
-python3 scripts/autoscience_cli.py validate-handoff examples/valid_handoff_record.json
-python3 scripts/autoscience_cli.py validate-inbox examples/valid_inbox_record.json
+python3 scripts/autoscience_cli.py validate-handoff examples/valid_handoff_record.json --expected-commit 0123456789abcdef0123456789abcdef01234567 --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 --require-provenance
+python3 scripts/autoscience_cli.py validate-inbox examples/valid_inbox_record.json --expected-commit 0123456789abcdef0123456789abcdef01234567 --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 --require-provenance
 python3 scripts/autoscience_cli.py validate-csv-schema stage-state examples/stage_state_registry.example.csv
 python3 scripts/autoscience_cli.py validate-csv-schema dataset-role examples/dataset_role_matrix.example.csv
 python3 scripts/autoscience_cli.py validate-csv-schema label-authorization examples/label_authorization_matrix.example.csv
 python3 scripts/autoscience_cli.py validate-csv-schema execution-authorization examples/execution_authorization_registry.example.csv
-python3 scripts/autoscience_cli.py workflow-health --policy configs/control_plane_policy.example.json --scientific-policy configs/scientific_policy.example.json --handoff examples/valid_handoff_record.json --inbox examples/valid_inbox_record.json --expected-commit 0123456789abcdef0123456789abcdef01234567
+python3 scripts/autoscience_cli.py workflow-health --policy configs/control_plane_policy.example.json --scientific-policy configs/scientific_policy.example.json --handoff examples/valid_handoff_record.json --inbox examples/valid_inbox_record.json --expected-commit 0123456789abcdef0123456789abcdef01234567 --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 --require-provenance
 python3 scripts/autoscience_cli.py run-unit configs/automation_unit.example.json
 python3 scripts/autoscience_cli.py run-unit configs/automation_unit.local_command.example.json
 python3 -m unittest discover -s tests
@@ -77,8 +78,12 @@ python3 -m unittest discover -s tests
 
 `run-unit` is the reusable automation unit runner. It renders the Web review
 request, validates fail-closed control/scientific policy, reads the transport
-handoff and inbox records, validates required-file coverage and request binding,
-enqueues the next goal, and writes a unit report under `runtime/`.
+handoff and inbox records, validates required-file coverage, request binding,
+review artifact provenance, payload provenance, fixed-session binding, goal
+hashing, enqueues the next goal, and writes a unit report under `runtime/`.
+By default `require_review_provenance=true` and
+`verify_review_provenance_files=true`, so an inbox record without the Web review
+artifact hash and payload hash is rejected.
 For `local_command` transports, the runner captures adapter stdout/stderr as
 bytes, decodes them with UTF-8/UTF-8-SIG/GB18030 fallback, and stores log tails
 under the runtime artifact directory. A project adapter's platform-specific

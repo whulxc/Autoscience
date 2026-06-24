@@ -67,7 +67,22 @@ human-readable summary, as long as they are lightweight and contain no secrets.
 - gate decision is valid;
 - next goal starts with `/goal` and references `docs/goals/`;
 - goal text hash matches;
+- request hash matches the rendered Web review request;
+- source Web review artifact path and SHA-256 are recorded;
+- review payload path and SHA-256 are recorded;
+- fixed review session binding is recorded and is not merely the user's active
+  tab;
 - the item is not already consumed.
+
+When `run-unit` is used with the default `require_review_provenance=true` and
+`verify_review_provenance_files=true`, the runner also checks that the recorded
+review artifact and payload files exist under safe relative paths and that their
+SHA-256 hashes match the inbox record. This protects the Codex/Web loop from
+stale output, local goal substitution, and fabricated inbox fields.
+Reusable examples may use `examples/`; real project adapters typically use an
+ignored `runtime/` artifact directory or a committed `research_context/web_reviews/`
+record, depending on whether the artifact is only transport evidence or a
+formal review record.
 
 ## Local Command Output
 
@@ -135,7 +150,8 @@ python3 scripts/autoscience_cli.py workflow-health \
   --inbox <artifact_dir>/inbox_record.json \
   --expected-commit <40_HEX_COMMIT> \
   --request-sha256 <REQUEST_SHA256> \
-  --required-file <PATH_FROM_REQUEST>
+  --required-file <PATH_FROM_REQUEST> \
+  --require-provenance
 ```
 
 The full deterministic path is:

@@ -35,6 +35,11 @@ from autoscience.workflow import (  # noqa: E402
 
 
 GOOD_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+GOOD_REQUEST_SHA256 = "c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0"
+GOOD_REVIEW_PATH = "examples/provenance/chatgpt_web_review_example.md"
+GOOD_REVIEW_SHA256 = "116717b4f50bacfaed251d4a7c6e93da2ae64c57c943fbd3afd199c0689fb9a5"
+GOOD_PAYLOAD_PATH = "examples/provenance/web_review_payload_example.json"
+GOOD_PAYLOAD_SHA256 = "bf1f58ee685c7ee050d8e879f1098371c157258ddc87fc10bcaf44f4d26b7df7"
 FULL_REQUIRED_FILES = [
     "docs/control_plane_workflow.md",
     "docs/security_model.md",
@@ -55,8 +60,14 @@ def valid_record() -> dict:
         "github_read_not_verified": False,
         "gate_decision": "READY",
         "files_read": ["docs/control_plane_workflow.md"],
+        "fixed_review_session_binding": "fixed_web_review_session_placeholder",
         "goal_command": goal,
         "goal_command_sha256": sha256_text(goal),
+        "request_sha256": GOOD_REQUEST_SHA256,
+        "review_payload_path": GOOD_PAYLOAD_PATH,
+        "review_payload_sha256": GOOD_PAYLOAD_SHA256,
+        "source_review_path": GOOD_REVIEW_PATH,
+        "source_review_sha256": GOOD_REVIEW_SHA256,
         "consumed": False,
     }
 
@@ -73,6 +84,30 @@ class ControlPlaneTest(unittest.TestCase):
     def test_valid_handoff_record(self) -> None:
         result = validate_handoff_record(valid_handoff())
         self.assertTrue(result.ok, result.to_dict())
+
+    def test_inbox_requires_review_provenance_when_enabled(self) -> None:
+        record = valid_record()
+        del record["source_review_sha256"]
+        result = validate_inbox_record(
+            record,
+            expected_commit=GOOD_COMMIT,
+            request_sha256=GOOD_REQUEST_SHA256,
+            require_provenance=True,
+        )
+        self.assertFalse(result.ok)
+        self.assertIn("review_provenance_missing:source_review_sha256", result.issues)
+
+    def test_handoff_requires_review_provenance_when_enabled(self) -> None:
+        record = valid_handoff()
+        del record["inbox_record"]["review_payload_path"]
+        result = validate_handoff_record(
+            record,
+            expected_commit=GOOD_COMMIT,
+            request_sha256=GOOD_REQUEST_SHA256,
+            require_provenance=True,
+        )
+        self.assertFalse(result.ok)
+        self.assertIn("inbox:review_provenance_missing:review_payload_path", result.issues)
 
     def test_rejects_mcp_as_formal_review_connector(self) -> None:
         record = valid_handoff()
@@ -171,6 +206,27 @@ class ControlPlaneTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_cli_validate_handoff_requires_provenance(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/autoscience_cli.py",
+                "validate-handoff",
+                "examples/valid_handoff_record.json",
+                "--expected-commit",
+                GOOD_COMMIT,
+                "--request-sha256",
+                GOOD_REQUEST_SHA256,
+                "--require-provenance",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_cli_validate_scientific_policy(self) -> None:
         result = subprocess.run(
             [sys.executable, "scripts/autoscience_cli.py", "validate-scientific-policy", "configs/scientific_policy.example.json"],
@@ -203,6 +259,8 @@ class ControlPlaneTest(unittest.TestCase):
             handoff_record=valid_handoff(),
             inbox_record=valid_record(),
             expected_commit=GOOD_COMMIT,
+            request_sha256=GOOD_REQUEST_SHA256,
+            require_provenance=True,
         )
         self.assertTrue(result.ok, result.to_dict())
 
@@ -253,6 +311,9 @@ class ControlPlaneTest(unittest.TestCase):
                     str(queue_dir),
                     "--expected-commit",
                     GOOD_COMMIT,
+                    "--request-sha256",
+                    GOOD_REQUEST_SHA256,
+                    "--require-provenance",
                 ],
                 cwd=ROOT,
                 text=True,
@@ -330,6 +391,59 @@ class ControlPlaneTest(unittest.TestCase):
             result = run_automation_unit(config, base_dir=ROOT)
             self.assertFalse(result.validation.ok)
             self.assertTrue(any("required_files_not_read" in item for item in result.validation.issues), result.to_dict())
+            self.assertFalse((Path(tmp) / "queue").exists())
+
+    def test_run_unit_rejects_missing_review_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bad_inbox = valid_record()
+            del bad_inbox["fixed_review_session_binding"]
+            inbox_path = Path(tmp) / "bad_inbox.json"
+            inbox_path.write_text(json.dumps(bad_inbox, indent=2), encoding="utf-8")
+            config = {
+                "artifact_dir": str(Path(tmp) / "artifacts"),
+                "branch": "main",
+                "conclusion_file": "examples/codex_execution_conclusion.example.md",
+                "expected_commit": GOOD_COMMIT,
+                "queue_dir": str(Path(tmp) / "queue"),
+                "repository": "OWNER/REPO",
+                "required_files": ["docs/control_plane_workflow.md"],
+                "transport": {
+                    "mode": "static_files",
+                    "handoff_record": "examples/valid_handoff_record.json",
+                    "inbox_record": str(inbox_path),
+                },
+            }
+            result = run_automation_unit(config, base_dir=ROOT)
+            self.assertFalse(result.validation.ok)
+            self.assertTrue(
+                any("review_provenance_missing:fixed_review_session_binding" in item for item in result.validation.issues),
+                result.to_dict(),
+            )
+            self.assertFalse((Path(tmp) / "queue").exists())
+
+    def test_run_unit_rejects_review_provenance_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bad_inbox = json.loads((ROOT / "examples/valid_inbox_record.json").read_text(encoding="utf-8"))
+            bad_inbox["source_review_sha256"] = "f" * 64
+            inbox_path = Path(tmp) / "bad_inbox.json"
+            inbox_path.write_text(json.dumps(bad_inbox, indent=2), encoding="utf-8")
+            config = {
+                "artifact_dir": str(Path(tmp) / "artifacts"),
+                "branch": "main",
+                "conclusion_file": "examples/codex_execution_conclusion.example.md",
+                "expected_commit": GOOD_COMMIT,
+                "queue_dir": str(Path(tmp) / "queue"),
+                "repository": "OWNER/REPO",
+                "required_files": FULL_REQUIRED_FILES,
+                "transport": {
+                    "mode": "static_files",
+                    "handoff_record": "examples/valid_handoff_record.json",
+                    "inbox_record": str(inbox_path),
+                },
+            }
+            result = run_automation_unit(config, base_dir=ROOT)
+            self.assertFalse(result.validation.ok)
+            self.assertIn("provenance:provenance_file_hash_mismatch:source_review_sha256", result.validation.issues)
             self.assertFalse((Path(tmp) / "queue").exists())
 
     def test_run_unit_rejects_unsupported_transport(self) -> None:

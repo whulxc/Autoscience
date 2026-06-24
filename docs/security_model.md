@@ -45,6 +45,9 @@ Autoscientce is designed to fail closed.
 - Enforce allowlisted read-only MCP tools.
 - Bind inbox entries to exact commit, fixed Web payload metadata, review
   artifact, required-file list, gate decision, goal text, and goal hash.
+- Require source review path/SHA-256, review payload path/SHA-256,
+  fixed-session binding, request hash, and goal hash before a returned Web
+  decision can enter the executable inbox.
 - Reject stale commits, missing required files, disallowed models, unverified
   GitHub reads, and substituted goals.
 - Validate each handoff lifecycle: prompt delivered, composer safe, latest

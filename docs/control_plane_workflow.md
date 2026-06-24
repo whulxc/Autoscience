@@ -61,6 +61,8 @@ The runner:
 - checks control-plane and scientific policies;
 - reads transport-produced handoff and inbox JSON;
 - validates that the Web response belongs to the latest request;
+- validates review artifact provenance, payload provenance, fixed-session
+  binding, request hash, and goal hash before trusting the inbox;
 - enqueues the next goal;
 - writes a machine-readable unit report.
 
@@ -77,7 +79,8 @@ A real project should connect its private CDP/browser/MCP adapter by writing
 the same handoff and inbox JSON records. The adapter transports messages; the
 runner decides whether the result is safe to use. The runner fails closed when
 required files are not read, request hashes do not match, transport JSON is
-missing or invalid, stale Web output is detected, or the inbox goal is
+missing or invalid, stale Web output is detected, review/payload provenance is
+missing or hash-mismatched, the fixed session is not bound, or the inbox goal is
 duplicated.
 
 ## Handoff Validation
@@ -95,19 +98,28 @@ python3 scripts/autoscience_cli.py make-review-request \
   --output /tmp/autoscience_review_request.md \
   --payload-output /tmp/autoscience_review_payload.json
 
-python3 scripts/autoscience_cli.py validate-handoff examples/valid_handoff_record.json
+python3 scripts/autoscience_cli.py validate-handoff examples/valid_handoff_record.json \
+  --expected-commit 0123456789abcdef0123456789abcdef01234567 \
+  --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 \
+  --require-provenance
 python3 scripts/autoscience_cli.py enqueue-inbox examples/valid_inbox_record.json \
   --queue-dir /tmp/autoscience_goal_inbox \
-  --expected-commit 0123456789abcdef0123456789abcdef01234567
+  --expected-commit 0123456789abcdef0123456789abcdef01234567 \
+  --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 \
+  --require-provenance
 python3 scripts/autoscience_cli.py inbox-status \
   --queue-dir /tmp/autoscience_goal_inbox \
-  --expected-commit 0123456789abcdef0123456789abcdef01234567
+  --expected-commit 0123456789abcdef0123456789abcdef01234567 \
+  --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 \
+  --require-provenance
 python3 scripts/autoscience_cli.py workflow-health \
   --policy configs/control_plane_policy.example.json \
   --scientific-policy configs/scientific_policy.example.json \
   --handoff examples/valid_handoff_record.json \
   --inbox examples/valid_inbox_record.json \
-  --expected-commit 0123456789abcdef0123456789abcdef01234567
+  --expected-commit 0123456789abcdef0123456789abcdef01234567 \
+  --request-sha256 c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0 \
+  --require-provenance
 ```
 
 A handoff is valid only when:
@@ -121,6 +133,9 @@ A handoff is valid only when:
 - structured review blocks are present;
 - the embedded inbox record passes exact commit, model, GitHub, gate, required
   files, goal shape, and goal-hash checks.
+- when provenance is required, the embedded inbox also binds to the source Web
+  review artifact, review payload, fixed review session, request hash, and
+  goal hash.
 
 ## Required Stop
 

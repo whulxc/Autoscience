@@ -7,6 +7,7 @@
   "expected_commit": "0123456789abcdef0123456789abcdef01234567",
   "policy_path": "configs/control_plane_policy.example.json",
   "queue_dir": "runtime/autoscience_local_command_inbox",
+  "require_review_provenance": true,
   "repository": "OWNER/REPO",
   "required_files": [
     "docs/control_plane_workflow.md",
@@ -16,6 +17,7 @@
   ],
   "scientific_policy_path": "configs/scientific_policy.example.json",
   "template_path": "templates/web_review_request.md",
+  "verify_review_provenance_files": true,
   "transport": {
     "command": [
       "python3",

@@ -9,11 +9,17 @@
     "configs/control_plane_policy.example.json",
     "configs/scientific_policy.example.json"
   ],
+  "fixed_review_session_binding": "fixed_web_review_session_placeholder",
   "gate_decision": "READY",
   "github_read_not_verified": false,
   "github_read_verified": true,
   "goal_command": "/goal Create and read docs/goals/example_next_goal.md after first running git fetch origin main.",
   "goal_command_sha256": "7afc95face0a1afaa5b6cadf89d348820034d1c537be9b083e824f2bb8530624",
   "model_allowed": true,
-  "model_self_report": "GPT-5.5 Thinking"
+  "model_self_report": "GPT-5.5 Thinking",
+  "request_sha256": "c0da5a2c41a965771b951fe4e4e4a505825cf1efb8d1afb3e93e6e70afe1d6b0",
+  "review_payload_path": "examples/provenance/web_review_payload_example.json",
+  "review_payload_sha256": "bf1f58ee685c7ee050d8e879f1098371c157258ddc87fc10bcaf44f4d26b7df7",
+  "source_review_path": "examples/provenance/chatgpt_web_review_example.md",
+  "source_review_sha256": "116717b4f50bacfaed251d4a7c6e93da2ae64c57c943fbd3afd199c0689fb9a5"
 }

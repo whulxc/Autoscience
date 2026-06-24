@@ -59,6 +59,8 @@ def command_validate_inbox(args: argparse.Namespace) -> int:
         load_json(Path(args.record)),
         expected_commit=args.expected_commit or None,
         required_files=args.required_file or None,
+        request_sha256=args.request_sha256 or None,
+        require_provenance=bool(args.require_provenance),
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
@@ -70,6 +72,7 @@ def command_validate_handoff(args: argparse.Namespace) -> int:
         expected_commit=args.expected_commit or None,
         required_files=args.required_file or None,
         request_sha256=args.request_sha256 or None,
+        require_provenance=bool(args.require_provenance),
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
@@ -116,19 +119,34 @@ def command_enqueue_inbox(args: argparse.Namespace) -> int:
         load_json(Path(args.record)),
         Path(args.queue_dir),
         expected_commit=args.expected_commit or None,
+        required_files=args.required_file or None,
+        request_sha256=args.request_sha256 or None,
+        require_provenance=bool(args.require_provenance),
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
 
 
 def command_inbox_status(args: argparse.Namespace) -> int:
-    result = summarize_inbox_queue(Path(args.queue_dir), expected_commit=args.expected_commit or None)
+    result = summarize_inbox_queue(
+        Path(args.queue_dir),
+        expected_commit=args.expected_commit or None,
+        required_files=args.required_file or None,
+        request_sha256=args.request_sha256 or None,
+        require_provenance=bool(args.require_provenance),
+    )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
 
 
 def command_consume_inbox(args: argparse.Namespace) -> int:
-    result = consume_inbox_record(Path(args.record), expected_commit=args.expected_commit or None)
+    result = consume_inbox_record(
+        Path(args.record),
+        expected_commit=args.expected_commit or None,
+        required_files=args.required_file or None,
+        request_sha256=args.request_sha256 or None,
+        require_provenance=bool(args.require_provenance),
+    )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
 
@@ -142,6 +160,7 @@ def command_workflow_health(args: argparse.Namespace) -> int:
         expected_commit=args.expected_commit or None,
         required_files=args.required_file or None,
         request_sha256=args.request_sha256 or None,
+        require_provenance=bool(args.require_provenance),
     )
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0 if result.ok else 2
@@ -184,6 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
     inbox.add_argument("record")
     inbox.add_argument("--expected-commit", default="")
     inbox.add_argument("--required-file", action="append")
+    inbox.add_argument("--request-sha256", default="")
+    inbox.add_argument("--require-provenance", action="store_true")
     inbox.set_defaults(func=command_validate_inbox)
 
     handoff = sub.add_parser("validate-handoff")
@@ -191,6 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
     handoff.add_argument("--expected-commit", default="")
     handoff.add_argument("--required-file", action="append")
     handoff.add_argument("--request-sha256", default="")
+    handoff.add_argument("--require-provenance", action="store_true")
     handoff.set_defaults(func=command_validate_handoff)
 
     scientific = sub.add_parser("validate-scientific-policy")
@@ -217,16 +239,25 @@ def build_parser() -> argparse.ArgumentParser:
     enqueue.add_argument("record")
     enqueue.add_argument("--queue-dir", required=True)
     enqueue.add_argument("--expected-commit", default="")
+    enqueue.add_argument("--required-file", action="append")
+    enqueue.add_argument("--request-sha256", default="")
+    enqueue.add_argument("--require-provenance", action="store_true")
     enqueue.set_defaults(func=command_enqueue_inbox)
 
     inbox_status = sub.add_parser("inbox-status")
     inbox_status.add_argument("--queue-dir", required=True)
     inbox_status.add_argument("--expected-commit", default="")
+    inbox_status.add_argument("--required-file", action="append")
+    inbox_status.add_argument("--request-sha256", default="")
+    inbox_status.add_argument("--require-provenance", action="store_true")
     inbox_status.set_defaults(func=command_inbox_status)
 
     consume = sub.add_parser("consume-inbox")
     consume.add_argument("record")
     consume.add_argument("--expected-commit", default="")
+    consume.add_argument("--required-file", action="append")
+    consume.add_argument("--request-sha256", default="")
+    consume.add_argument("--require-provenance", action="store_true")
     consume.set_defaults(func=command_consume_inbox)
 
     health = sub.add_parser("workflow-health")
@@ -237,6 +268,7 @@ def build_parser() -> argparse.ArgumentParser:
     health.add_argument("--expected-commit", default="")
     health.add_argument("--required-file", action="append")
     health.add_argument("--request-sha256", default="")
+    health.add_argument("--require-provenance", action="store_true")
     health.set_defaults(func=command_workflow_health)
 
     run_unit = sub.add_parser("run-unit")

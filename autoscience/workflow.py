@@ -12,6 +12,8 @@ from typing import Any
 
 from .control_plane import (
     ValidationResult,
+    relative_path_is_safe,
+    sha256_file,
     sha256_text,
     validate_handoff_record,
     validate_inbox_record,
@@ -111,8 +113,22 @@ def write_review_request(request: ReviewRequest, output: Path, payload_output: P
         payload_output.write_text(json.dumps(request.payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def enqueue_inbox_record(record: dict[str, Any], queue_dir: Path, *, expected_commit: str | None = None) -> ValidationResult:
-    result = validate_inbox_record(record, expected_commit=expected_commit)
+def enqueue_inbox_record(
+    record: dict[str, Any],
+    queue_dir: Path,
+    *,
+    expected_commit: str | None = None,
+    required_files: list[str] | None = None,
+    request_sha256: str | None = None,
+    require_provenance: bool = False,
+) -> ValidationResult:
+    result = validate_inbox_record(
+        record,
+        expected_commit=expected_commit,
+        required_files=required_files,
+        request_sha256=request_sha256,
+        require_provenance=require_provenance,
+    )
     if not result.ok:
         return result
 
@@ -136,6 +152,8 @@ def summarize_inbox_queue(
     *,
     expected_commit: str | None = None,
     required_files: list[str] | None = None,
+    request_sha256: str | None = None,
+    require_provenance: bool = False,
 ) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
@@ -146,7 +164,13 @@ def summarize_inbox_queue(
         except json.JSONDecodeError:
             issues.append(f"inbox_record_json_invalid:{path}")
             continue
-        result = validate_inbox_record(record, expected_commit=expected_commit, required_files=required_files)
+        result = validate_inbox_record(
+            record,
+            expected_commit=expected_commit,
+            required_files=required_files,
+            request_sha256=request_sha256,
+            require_provenance=require_provenance,
+        )
         if result.issues:
             issues.extend(f"{path}:{item}" for item in result.issues)
         if result.warnings:
@@ -173,9 +197,17 @@ def consume_inbox_record(
     *,
     expected_commit: str | None = None,
     required_files: list[str] | None = None,
+    request_sha256: str | None = None,
+    require_provenance: bool = False,
 ) -> ValidationResult:
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    result = validate_inbox_record(record, expected_commit=expected_commit, required_files=required_files)
+    result = validate_inbox_record(
+        record,
+        expected_commit=expected_commit,
+        required_files=required_files,
+        request_sha256=request_sha256,
+        require_provenance=require_provenance,
+    )
     if not result.ok:
         return result
     if bool(record.get("consumed")):
@@ -195,6 +227,7 @@ def summarize_workflow_health(
     expected_commit: str | None = None,
     required_files: list[str] | None = None,
     request_sha256: str | None = None,
+    require_provenance: bool = False,
 ) -> ValidationResult:
     issues: list[str] = []
     warnings: list[str] = []
@@ -216,17 +249,50 @@ def summarize_workflow_health(
             expected_commit=expected_commit,
             required_files=required_files,
             request_sha256=request_sha256,
+            require_provenance=require_provenance,
         )
         issues.extend(f"handoff:{item}" for item in result.issues)
         warnings.extend(f"handoff:{item}" for item in result.warnings)
         details["handoff_ok"] = result.ok
     if inbox_record is not None:
-        result = validate_inbox_record(inbox_record, expected_commit=expected_commit, required_files=required_files)
+        result = validate_inbox_record(
+            inbox_record,
+            expected_commit=expected_commit,
+            required_files=required_files,
+            request_sha256=request_sha256,
+            require_provenance=require_provenance,
+        )
         issues.extend(f"inbox:{item}" for item in result.issues)
         warnings.extend(f"inbox:{item}" for item in result.warnings)
         details["inbox_ok"] = result.ok
 
     return ValidationResult(ok=not issues, issues=issues, warnings=warnings, details=details)
+
+
+def verify_inbox_provenance_files(record: dict[str, Any], *, root: Path) -> ValidationResult:
+    issues: list[str] = []
+    details: dict[str, Any] = {}
+    for path_field, hash_field in (
+        ("source_review_path", "source_review_sha256"),
+        ("review_payload_path", "review_payload_sha256"),
+    ):
+        raw_path = str(record.get(path_field) or "")
+        expected_hash = str(record.get(hash_field) or "")
+        if not raw_path:
+            issues.append(f"provenance_file_path_missing:{path_field}")
+            continue
+        if not relative_path_is_safe(raw_path):
+            issues.append(f"provenance_file_path_not_safe_relative:{path_field}")
+            continue
+        path = root / raw_path
+        if not path.exists():
+            issues.append(f"provenance_file_missing:{path_field}:{raw_path}")
+            continue
+        actual_hash = sha256_file(path)
+        details[hash_field] = actual_hash
+        if expected_hash != actual_hash:
+            issues.append(f"provenance_file_hash_mismatch:{hash_field}")
+    return ValidationResult(ok=not issues, issues=issues, details=details)
 
 
 def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None) -> AutomationUnitResult:
@@ -257,6 +323,8 @@ def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None)
         return AutomationUnitResult(result, AutomationUnitPaths(request_path, payload_path, report_path))
 
     expected_commit = str(config["expected_commit"])
+    require_provenance = bool(config.get("require_review_provenance", True))
+    verify_provenance_files = bool(config.get("verify_review_provenance_files", True))
 
     try:
         template_text = (root / str(config.get("template_path") or "templates/web_review_request.md")).read_text(encoding="utf-8")
@@ -379,18 +447,38 @@ def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None)
         expected_commit=expected_commit,
         required_files=request.payload["required_files"],
         request_sha256=request.payload["request_sha256"],
+        require_provenance=require_provenance,
     )
     issues.extend(health.issues)
     warnings.extend(health.warnings)
     details["health"] = health.details
 
+    if require_provenance and verify_provenance_files and inbox_record is not None:
+        provenance_files = verify_inbox_provenance_files(inbox_record, root=root)
+        issues.extend(f"provenance:{item}" for item in provenance_files.issues)
+        warnings.extend(f"provenance:{item}" for item in provenance_files.warnings)
+        details["provenance_files"] = provenance_files.details
+
     if not issues:
-        enqueue_result = enqueue_inbox_record(inbox_record, queue_dir, expected_commit=expected_commit)
+        enqueue_result = enqueue_inbox_record(
+            inbox_record,
+            queue_dir,
+            expected_commit=expected_commit,
+            required_files=request.payload["required_files"],
+            request_sha256=request.payload["request_sha256"],
+            require_provenance=require_provenance,
+        )
         issues.extend(f"enqueue:{item}" for item in enqueue_result.issues)
         warnings.extend(f"enqueue:{item}" for item in enqueue_result.warnings)
         details["enqueue"] = enqueue_result.details
 
-        queue_result = summarize_inbox_queue(queue_dir, expected_commit=expected_commit, required_files=request.payload["required_files"])
+        queue_result = summarize_inbox_queue(
+            queue_dir,
+            expected_commit=expected_commit,
+            required_files=request.payload["required_files"],
+            request_sha256=request.payload["request_sha256"],
+            require_provenance=require_provenance,
+        )
         issues.extend(f"queue:{item}" for item in queue_result.issues)
         warnings.extend(f"queue:{item}" for item in queue_result.warnings)
         details["queue"] = queue_result.details
@@ -398,7 +486,13 @@ def run_automation_unit(config: dict[str, Any], *, base_dir: Path | None = None)
         if not issues and bool(config.get("consume_after_enqueue")):
             target = enqueue_result.details.get("target")
             if target:
-                consume_result = consume_inbox_record(Path(target), expected_commit=expected_commit, required_files=request.payload["required_files"])
+                consume_result = consume_inbox_record(
+                    Path(target),
+                    expected_commit=expected_commit,
+                    required_files=request.payload["required_files"],
+                    request_sha256=request.payload["request_sha256"],
+                    require_provenance=require_provenance,
+                )
                 issues.extend(f"consume:{item}" for item in consume_result.issues)
                 warnings.extend(f"consume:{item}" for item in consume_result.warnings)
                 details["consume"] = consume_result.details
